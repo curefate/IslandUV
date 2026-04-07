@@ -22,7 +22,7 @@ public class IslandUvImportConfig : ScriptableObject
         [Header("General")]
         public bool enabled = true;
 
-        [Tooltip("法线夹角阈值（degrees）。相邻三角面法线夹角 <= 阈值则归为同一块（block/chart）。")]
+        [Tooltip("法线夹角阈值（degrees）。相邻三角面法线夹角 <= 阈值则归为同一Island。")]
         [Range(0f, 90f)]
         public float normalAngleThresholdDeg = 25f;
 
@@ -30,15 +30,15 @@ public class IslandUvImportConfig : ScriptableObject
         [Range(0, 7)]
         public int targetUvChannel = 2;
 
-        [Tooltip("是否进行按 block 的顶点拆分。")]
-        public bool splitVerticesAcrossBlocks = true;
+        [Tooltip("是否进行按 Island 的顶点拆分。")]
+        public bool splitVertices = true;
 
         /* [Header("TextUV Mapping")]
-        [Tooltip("每个 block 的平面投影 TextUV 缩放：数值越大 => 文字 tile 越大（UV 变化越慢）。")]
+        [Tooltip("每个 Island 的平面投影 TextUV 缩放：数值越大 => 文字 tile 越大（UV 变化越慢）。")]
         public float tileWorldSize = 1.0f; */
 
-        [Tooltip("是否把投影坐标归一化到 [0,1] 范围（通常不需要；文字平铺更常用不归一化）。")]
-        public bool normalizePerBlock = false;
+        [Tooltip("是否把投影坐标归一化到 [0,1] 范围。")]
+        public bool normalizePerIsland = false;
     }
 
     public List<Entry> entries = new();

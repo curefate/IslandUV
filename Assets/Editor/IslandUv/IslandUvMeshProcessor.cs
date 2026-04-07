@@ -59,7 +59,7 @@ public static class IslandUvMeshProcessor
         IslandUvImportConfig.Settings settings)
     {
         // 如果不开拆顶点：强制 islandId=0（所有顶点共享一份）
-        int effectiveIsland = settings.splitVerticesAcrossBlocks ? islandId : 0;
+        int effectiveIsland = settings.splitVertices ? islandId : 0;
 
         var key = (originalV, effectiveIsland);
         if (vertexMap.TryGetValue(key, out int existing))
@@ -273,9 +273,9 @@ public static class IslandUvMeshProcessor
             int i1 = tris[i].i1;
             int i2 = tris[i].i2;
 
-            int o0 = GetOrCreateVertex(i0, iid, basis, s.normalizePerBlock, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
-            int o1 = GetOrCreateVertex(i1, iid, basis, s.normalizePerBlock, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
-            int o2 = GetOrCreateVertex(i2, iid, basis, s.normalizePerBlock, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o0 = GetOrCreateVertex(i0, iid, basis, s.normalizePerIsland, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o1 = GetOrCreateVertex(i1, iid, basis, s.normalizePerIsland, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o2 = GetOrCreateVertex(i2, iid, basis, s.normalizePerIsland, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
 
             newTriangles[i * 3] = o0;
             newTriangles[i * 3 + 1] = o1;
