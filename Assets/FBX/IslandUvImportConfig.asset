@@ -14,8 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp-Editor::IslandUvImportConfig
   defaultSettings:
     enabled: 1
-    normalAngleThresholdDeg: 25
+    normalAngleThresholdDeg: 35
     targetUvChannel: 0
-    splitVertices: 1
-    normalizeUv: 0
+    writeIslandIdToUv: 1
+    islandIdUvChannel: 7
+    allowAcrossSubMeshes: 1
+    normalSource: 1
+    propagation: 0
+    ignoreSmall: 1
+    smallIsland: 0
+    minIslandTris: 4
+    minIslandAreaRatio: 0.001
+    ignoredUv: {x: 0, y: 0}
   entries: []

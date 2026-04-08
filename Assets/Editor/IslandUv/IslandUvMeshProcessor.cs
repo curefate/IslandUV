@@ -2,6 +2,7 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using UnityEngine.Rendering;
 
 public static class IslandUvMeshProcessor
 {
@@ -22,6 +23,21 @@ public static class IslandUvMeshProcessor
     {
         public int i0, i1, i2;
         public Vector3 normal;
+        public int subMesh;
+    }
+
+    private static Vector3 ComputeFaceNormal(Vector3 v0, Vector3 v1, Vector3 v2)
+    {
+        Vector3 n = Vector3.Cross(v1 - v0, v2 - v0);
+        if (n.sqrMagnitude <= 1e-12f) return Vector3.up;
+        return n.normalized;
+    }
+
+    private static Vector3 ComputeTriVertexNormal(Vector3 n0, Vector3 n1, Vector3 n2)
+    {
+        Vector3 n = n0 + n1 + n2;
+        if (n.sqrMagnitude <= 1e-12f) return Vector3.up;
+        return n.normalized;
     }
 
     private struct IslandBasis
@@ -48,7 +64,8 @@ public static class IslandUvMeshProcessor
         int originalV,
         int islandId,
         IslandBasis islandBasis,
-        bool normalizeUv,
+    bool ignoredIsland,
+    Vector2 ignoredUv,
         Vector3[] vertices,
         Vector3[] srcNormals,
         bool hasNormals,
@@ -75,15 +92,16 @@ public static class IslandUvMeshProcessor
         Vector3 p = vPos - islandBasis.origin;
         Vector2 uv = new Vector2(Vector3.Dot(p, islandBasis.T), Vector3.Dot(p, islandBasis.B));
 
-        // 第二步：应用归一化（如果启用）
-        // 注意：此时 uvMin/uvMax 已在前面步骤计算完成
-        if (normalizeUv)
-        {
-            Vector2 size = islandBasis.uvMax - islandBasis.uvMin;
-            uv = uv - islandBasis.uvMin;  // 平移到原点
-            if (Mathf.Abs(size.x) > 1e-6f) uv.x /= size.x;  // 归一化到 [0,1]
-            if (Mathf.Abs(size.y) > 1e-6f) uv.y /= size.y;
-        }
+    // 第二步：归一化到 [0,1]
+    // 注意：uvMin/uvMax 已在前面步骤计算完成
+    Vector2 size = islandBasis.uvMax - islandBasis.uvMin;
+    uv = uv - islandBasis.uvMin; // 平移到原点
+    if (Mathf.Abs(size.x) > 1e-6f) uv.x /= size.x;
+    if (Mathf.Abs(size.y) > 1e-6f) uv.y /= size.y;
+
+        // 小岛忽略：写入固定 UV
+        if (ignoredIsland)
+            uv = ignoredUv;
 
         newTextUV.Add(uv);
 
@@ -96,45 +114,85 @@ public static class IslandUvMeshProcessor
         if (s == null) throw new ArgumentNullException(nameof(s));
 
         var vertices = mesh.vertices;
-        var triangles = mesh.triangles;
         if (vertices == null || vertices.Length == 0) throw new InvalidOperationException("Mesh has no vertices.");
-        if (triangles == null || triangles.Length == 0) throw new InvalidOperationException("Mesh has no triangles.");
+
+        int subMeshCount = Mathf.Max(1, mesh.subMeshCount);
+        var subMeshTriangles = new int[subMeshCount][];
+        int totalIndexCount = 0;
+        for (int sm = 0; sm < subMeshCount; sm++)
+        {
+            var t = mesh.GetTriangles(sm);
+            subMeshTriangles[sm] = t;
+            if (t != null) totalIndexCount += t.Length;
+        }
+        if (totalIndexCount == 0) throw new InvalidOperationException("Mesh has no triangles.");
 
         // triangles data
-        int triCount = triangles.Length / 3;
+        int triCount = totalIndexCount / 3;
         var tris = new Tri[triCount];
 
-        // 1) Calculate triangles
-        for (int i = 0; i < triCount; i++)
+        Vector3[] srcNormals = mesh.normals;
+        bool hasNormals = srcNormals != null && srcNormals.Length == vertices.Length;
+
+        bool useVertexNormals = (s.normalSource == IslandUvImportConfig.NormalSource.Vertex);
+        if (useVertexNormals && !hasNormals)
         {
-            int index = i * 3;
-            int i0 = triangles[index];
-            int i1 = triangles[index + 1];
-            int i2 = triangles[index + 2];
-            Vector3 v0 = vertices[i0];
-            Vector3 v1 = vertices[i1];
-            Vector3 v2 = vertices[i2];
-            Vector3 normal = Vector3.Cross(v1 - v0, v2 - v0);
-
-            // Check for degenerate triangles and warn user
-            if (normal.sqrMagnitude <= 1e-12f)
-            {
-                Debug.LogWarning($"Mesh '{mesh.name}' contains degenerate triangle {i} with near-zero area. Assigning default normal.");
-                normal = Vector3.up;
-            }
-            else
-            {
-                normal.Normalize();
-            }
-
-            tris[i] = new Tri
-            {
-                i0 = i0,
-                i1 = i1,
-                i2 = i2,
-                normal = normal
-            };
+            Debug.LogWarning($"Mesh '{mesh.name}' has no valid vertex normals. Falling back to face normals for IslandUV clustering.");
+            useVertexNormals = false;
         }
+
+        // Build a global triangle list, preserving source submesh
+        int triCursor = 0;
+        for (int sm = 0; sm < subMeshCount; sm++)
+        {
+            var triArr = subMeshTriangles[sm];
+            if (triArr == null || triArr.Length == 0) continue;
+            if ((triArr.Length % 3) != 0)
+                throw new InvalidOperationException($"Mesh '{mesh.name}' submesh {sm} triangle index array length is not a multiple of 3.");
+
+            for (int idx = 0; idx < triArr.Length; idx += 3)
+            {
+                int i0 = triArr[idx];
+                int i1 = triArr[idx + 1];
+                int i2 = triArr[idx + 2];
+                Vector3 v0 = vertices[i0];
+                Vector3 v1 = vertices[i1];
+                Vector3 v2 = vertices[i2];
+
+                Vector3 normal;
+                if (useVertexNormals)
+                {
+                    normal = ComputeTriVertexNormal(srcNormals[i0], srcNormals[i1], srcNormals[i2]);
+                }
+                else
+                {
+                    // Face normal with degenerate warning
+                    Vector3 faceN = Vector3.Cross(v1 - v0, v2 - v0);
+                    if (faceN.sqrMagnitude <= 1e-12f)
+                    {
+                        Debug.LogWarning($"Mesh '{mesh.name}' contains degenerate triangle {triCursor} (submesh {sm}) with near-zero area. Assigning default normal.");
+                        normal = Vector3.up;
+                    }
+                    else
+                    {
+                        normal = faceN.normalized;
+                    }
+                }
+
+                tris[triCursor] = new Tri
+                {
+                    i0 = i0,
+                    i1 = i1,
+                    i2 = i2,
+                    normal = normal,
+                    subMesh = sm
+                };
+                triCursor++;
+            }
+        }
+
+        if (triCursor != triCount)
+            throw new InvalidOperationException($"Internal error: triangle count mismatch for mesh '{mesh.name}'.");
 
         // 2) Edge -> Triangle mapping
         var edgeToTris = new Dictionary<Edge, List<int>>();
@@ -149,19 +207,46 @@ public static class IslandUvMeshProcessor
         // 3) Triangle neighbor list
         var triNeighbors = new List<List<int>>();
         for (int i = 0; i < triCount; i++) triNeighbors.Add(new List<int>(3));
+
+        int nonManifoldEdgeCount = 0;
+        int maxTrisOnAnEdge = 0;
         foreach (var kvp in edgeToTris)
         {
             var triangleIndices = kvp.Value;
             if (triangleIndices.Count < 2) continue; // Boundary edge
+
+            // Non-manifold edge: more than 2 triangles share the same edge.
+            // Treat as boundary to avoid island growth "jumping" across unrelated surfaces.
+            if (triangleIndices.Count > 2)
+            {
+                nonManifoldEdgeCount++;
+                if (triangleIndices.Count > maxTrisOnAnEdge) maxTrisOnAnEdge = triangleIndices.Count;
+                continue;
+            }
+
             // Add neighbors
             for (int i = 0; i < triangleIndices.Count; i++)
             {
                 for (int j = i + 1; j < triangleIndices.Count; j++)
                 {
-                    triNeighbors[triangleIndices[i]].Add(triangleIndices[j]);
-                    triNeighbors[triangleIndices[j]].Add(triangleIndices[i]);
+                    int ta = triangleIndices[i];
+                    int tb = triangleIndices[j];
+
+                    // Optionally prevent adjacency across submesh boundaries.
+                    if (!s.allowAcrossSubMeshes && tris[ta].subMesh != tris[tb].subMesh)
+                        continue;
+
+                    triNeighbors[ta].Add(tb);
+                    triNeighbors[tb].Add(ta);
                 }
             }
+        }
+
+        if (nonManifoldEdgeCount > 0)
+        {
+            Debug.LogWarning(
+                $"Mesh '{mesh.name}' contains {nonManifoldEdgeCount} non-manifold edges (max triangles on one edge: {maxTrisOnAnEdge}). " +
+                "These edges were treated as boundaries for IslandUV clustering. Consider cleaning the mesh topology if results look fragmented.");
         }
 
         // 4) Cluster triangles into islands
@@ -172,12 +257,23 @@ public static class IslandUvMeshProcessor
         int islandCount = 0;
         var queue = new Queue<int>();
 
+        bool useIslandRef = (s.propagation == IslandUvImportConfig.Propagation.Island);
+        var islandRefNormal = new List<Vector3>(128);
+        var islandRefCount = new List<int>(128);
+
         for (int i = 0; i < triCount; i++)
         {
             if (triIsland[i] != -1) continue; // Already assigned
 
             int iid = islandCount++;
             triIsland[i] = iid;
+
+            if (useIslandRef)
+            {
+                islandRefNormal.Add(tris[i].normal);
+                islandRefCount.Add(1);
+            }
+
             queue.Clear();
             queue.Enqueue(i);
 
@@ -190,10 +286,21 @@ public static class IslandUvMeshProcessor
                 foreach (var nbIndex in neighbors)
                 {
                     if (triIsland[nbIndex] != -1) continue; // Already assigned
-                    float d = Vector3.Dot(currentNormal, tris[nbIndex].normal);
+                    Vector3 refN = useIslandRef ? islandRefNormal[iid] : currentNormal;
+                    float d = Vector3.Dot(refN, tris[nbIndex].normal);
                     if (d >= cosThreshold)
                     {
                         triIsland[nbIndex] = iid;
+
+                        if (useIslandRef)
+                        {
+                            // Running mean on unit sphere: sum then normalize.
+                            int c = islandRefCount[iid] + 1;
+                            islandRefCount[iid] = c;
+                            Vector3 sum = islandRefNormal[iid] * (c - 1) + tris[nbIndex].normal;
+                            islandRefNormal[iid] = sum.sqrMagnitude <= 1e-12f ? Vector3.up : sum.normalized;
+                        }
+
                         queue.Enqueue(nbIndex);
                     }
                 }
@@ -206,6 +313,11 @@ public static class IslandUvMeshProcessor
         var islandVerSum = new Vector3[islandCount];
         var islandVerCount = new int[islandCount];
 
+    // Small island metrics
+    var islandTriCount = new int[islandCount];
+    var islandArea = new float[islandCount];
+    float totalArea = 0f;
+
         // accumulate normal and vertex positions
         for (int i = 0; i < triCount; i++)
         {
@@ -214,6 +326,41 @@ public static class IslandUvMeshProcessor
             islandNormSum[iid] += tri.normal;
             islandVerSum[iid] += vertices[tri.i0] + vertices[tri.i1] + vertices[tri.i2];
             islandVerCount[iid] += 3;
+
+            islandTriCount[iid] += 1;
+
+            // Geometric area (world/object space units^2)
+            Vector3 v0 = vertices[tri.i0];
+            Vector3 v1 = vertices[tri.i1];
+            Vector3 v2 = vertices[tri.i2];
+            float a = Vector3.Cross(v1 - v0, v2 - v0).magnitude * 0.5f;
+            islandArea[iid] += a;
+            totalArea += a;
+        }
+
+        // Decide which islands are ignored
+        var ignoredIsland = new bool[islandCount];
+        if (s.ignoreSmall)
+        {
+            if (s.smallIsland == IslandUvImportConfig.SmallIsland.TriCount)
+            {
+                int minTris = Mathf.Max(0, s.minIslandTris);
+                for (int i = 0; i < islandCount; i++)
+                    ignoredIsland[i] = islandTriCount[i] < minTris;
+            }
+            else
+            {
+                if (totalArea <= 1e-12f)
+                {
+                    Debug.LogWarning($"Mesh '{mesh.name}' total area is near zero; skipping AreaRatio small-island filtering.");
+                }
+                else
+                {
+                    float minRatio = Mathf.Clamp01(s.minIslandAreaRatio);
+                    for (int i = 0; i < islandCount; i++)
+                        ignoredIsland[i] = (islandArea[i] / totalArea) < minRatio;
+                }
+            }
         }
 
         for (int i = 0; i < islandCount; i++)
@@ -253,13 +400,15 @@ public static class IslandUvMeshProcessor
         // 6) Calculate final UVs
         var newVertices = new List<Vector3>(vertices.Length);
         var newNormals = new List<Vector3>(vertices.Length);
-        var newTriangles = new int[triangles.Length];
         var newTextUV = new List<Vector2>(vertices.Length);
 
-        Vector3[] srcNormals = mesh.normals;
-        bool hasNormals = srcNormals != null && srcNormals.Length == vertices.Length;
+        // srcNormals / hasNormals are computed earlier (used both for clustering normals and for output normal copying).
 
         var vertexMap = new Dictionary<(int v, int i), int>();
+
+        var newTrianglesBySubMesh = new List<int>[subMeshCount];
+        for (int sm = 0; sm < subMeshCount; sm++)
+            newTrianglesBySubMesh[sm] = new List<int>(subMeshTriangles[sm]?.Length ?? 0);
 
         for (int i = 0; i < triCount; i++)
         {
@@ -270,20 +419,33 @@ public static class IslandUvMeshProcessor
             int i1 = tris[i].i1;
             int i2 = tris[i].i2;
 
-            int o0 = GetOrCreateVertex(i0, iid, basis, s.normalizeUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
-            int o1 = GetOrCreateVertex(i1, iid, basis, s.normalizeUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
-            int o2 = GetOrCreateVertex(i2, iid, basis, s.normalizeUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            bool isIgnored = ignoredIsland[iid];
+            Vector2 fixedUv = s.ignoredUv;
 
-            newTriangles[i * 3] = o0;
-            newTriangles[i * 3 + 1] = o1;
-            newTriangles[i * 3 + 2] = o2;
+            int o0 = GetOrCreateVertex(i0, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o1 = GetOrCreateVertex(i1, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o2 = GetOrCreateVertex(i2, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+
+            newTrianglesBySubMesh[tris[i].subMesh].Add(o0);
+            newTrianglesBySubMesh[tris[i].subMesh].Add(o1);
+            newTrianglesBySubMesh[tris[i].subMesh].Add(o2);
         }
 
         // 7) Assign back to mesh
+
+        // If the processed mesh exceeds 16-bit index limits, switch to 32-bit indices BEFORE setting triangles.
+        // (Splitting vertices per island can increase vertex count significantly.)
+        if (newVertices.Count > 65535)
+            mesh.indexFormat = IndexFormat.UInt32;
+
         mesh.SetVertices(newVertices);
         if (hasNormals) mesh.SetNormals(newNormals);
         else mesh.RecalculateNormals();
-        mesh.SetTriangles(newTriangles, 0);
+
+        mesh.subMeshCount = subMeshCount;
+        for (int sm = 0; sm < subMeshCount; sm++)
+            mesh.SetTriangles(newTrianglesBySubMesh[sm], sm);
+
         mesh.SetUVs(s.targetUvChannel, newTextUV);
     }
 }
