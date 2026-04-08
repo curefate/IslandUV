@@ -46,6 +46,9 @@ public class IslandUvImportConfig : ScriptableObject
         [Range(0, 7)]
         public int targetUvChannel = 2;
 
+        [Tooltip("是否把 IslandId 写入顶点色（Color32）。启用后：R/G 编码 16-bit islandId（id = R + G*256），B=0，A=255。便于 shader 进行 per-island 配置。")]
+        public bool writeIslandIdToVertexColor = true;
+
         [Tooltip("是否允许跨 SubMesh 进行相邻三角形连通（影响 Island 聚类）。默认开启：忽略材质分组，仅按几何相邻+法线阈值聚类。")]
         public bool allowAcrossSubMeshes = true;
 

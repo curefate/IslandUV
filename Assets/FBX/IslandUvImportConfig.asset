@@ -16,8 +16,7 @@ MonoBehaviour:
     enabled: 1
     normalAngleThresholdDeg: 35
     targetUvChannel: 0
-    writeIslandIdToUv: 1
-    islandIdUvChannel: 7
+    writeIslandIdToVertexColor: 1
     allowAcrossSubMeshes: 1
     normalSource: 1
     propagation: 0

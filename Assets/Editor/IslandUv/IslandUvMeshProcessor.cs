@@ -72,6 +72,7 @@ public static class IslandUvMeshProcessor
         List<Vector3> newVertices,
         List<Vector3> newNormals,
         List<Vector2> newTextUV,
+    List<Color32> newColors,
         Dictionary<(int v, int i), int> vertexMap,
         IslandUvImportConfig.Settings settings)
     {
@@ -87,6 +88,16 @@ public static class IslandUvMeshProcessor
 
         if (hasNormals)
             newNormals.Add(srcNormals[originalV]);
+
+        if (settings.writeIslandIdToVertexColor)
+        {
+            // 16-bit islandId packing into Color32 (little endian): id = r + g*256
+            // Note: if islandCount can exceed 65535 in the future, upgrade packing (e.g. RGB 24-bit).
+            ushort id16 = (ushort)Mathf.Clamp(islandId, 0, 65535);
+            byte r = (byte)(id16 & 0xFF);
+            byte g = (byte)((id16 >> 8) & 0xFF);
+            newColors.Add(new Color32(r, g, 0, 255));
+        }
 
         // 第一步：计算投影坐标
         Vector3 p = vPos - islandBasis.origin;
@@ -401,6 +412,7 @@ public static class IslandUvMeshProcessor
         var newVertices = new List<Vector3>(vertices.Length);
         var newNormals = new List<Vector3>(vertices.Length);
         var newTextUV = new List<Vector2>(vertices.Length);
+    var newColors = s.writeIslandIdToVertexColor ? new List<Color32>(vertices.Length) : null;
 
         // srcNormals / hasNormals are computed earlier (used both for clustering normals and for output normal copying).
 
@@ -422,9 +434,9 @@ public static class IslandUvMeshProcessor
             bool isIgnored = ignoredIsland[iid];
             Vector2 fixedUv = s.ignoredUv;
 
-            int o0 = GetOrCreateVertex(i0, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
-            int o1 = GetOrCreateVertex(i1, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
-            int o2 = GetOrCreateVertex(i2, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o0 = GetOrCreateVertex(i0, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
+            int o1 = GetOrCreateVertex(i1, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
+            int o2 = GetOrCreateVertex(i2, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
 
             newTrianglesBySubMesh[tris[i].subMesh].Add(o0);
             newTrianglesBySubMesh[tris[i].subMesh].Add(o1);
@@ -441,6 +453,9 @@ public static class IslandUvMeshProcessor
         mesh.SetVertices(newVertices);
         if (hasNormals) mesh.SetNormals(newNormals);
         else mesh.RecalculateNormals();
+
+        if (s.writeIslandIdToVertexColor)
+            mesh.SetColors(newColors);
 
         mesh.subMeshCount = subMeshCount;
         for (int sm = 0; sm < subMeshCount; sm++)
