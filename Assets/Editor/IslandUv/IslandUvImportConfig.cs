@@ -22,17 +22,15 @@ public class IslandUvImportConfig : ScriptableObject
         [Header("General")]
         public bool enabled = true;
 
-        [Tooltip("法线夹角阈值（degrees）。相邻三角面法线夹角 <= 阈值则归为同一 Island。")]
         [Range(0f, 90f)]
         public float normalAngleThresholdDeg = 25f;
 
-        [Tooltip("写入 TextUV 的 UV 通道。")]
         [Range(0, 7)]
         public int targetUvChannel = 2;
 
-        [Tooltip("是否进行按 Island 的顶点拆分。")]
+        /* [Tooltip("是否进行按 Island 的顶点拆分。")]
         [HideInInspector]
-        public bool splitVertices = true;
+        public bool splitVertices = true; */
 
         /* [Header("TextUV Mapping")]
         [Tooltip("每个 Island 的平面投影 TextUV 缩放：数值越大 => 文字 tile 越大（UV 变化越慢）。")]

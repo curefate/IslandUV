@@ -58,10 +58,7 @@ public static class IslandUvMeshProcessor
         Dictionary<(int v, int i), int> vertexMap,
         IslandUvImportConfig.Settings settings)
     {
-        // 如果不开拆顶点：强制 islandId=0（所有顶点共享一份）
-        int effectiveIsland = settings.splitVertices ? islandId : 0;
-
-        var key = (originalV, effectiveIsland);
+        var key = (originalV, islandId);
         if (vertexMap.TryGetValue(key, out int existing))
             return existing;
 
