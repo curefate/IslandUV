@@ -7,6 +7,9 @@ Shader "IslandUV/Debug/IslandIdGradient"
         _Light("Light", Color) = (1,1,1,1)
         _Dark("Dark", Color) = (0.2,0.2,0.2,1)
         _Sat("Saturation", Range(0,2)) = 1
+
+    [Toggle] _HighlightIgnored("Highlight Ignored Islands (id=0xFFFF)", Float) = 1
+    _IgnoredColor("Ignored Color", Color) = (0,0,0,1)
     }
 
     SubShader
@@ -35,6 +38,9 @@ Shader "IslandUV/Debug/IslandIdGradient"
                 half4 _Light;
                 half4 _Dark;
                 half _Sat;
+
+                float _HighlightIgnored;
+                half4 _IgnoredColor;
             CBUFFER_END
 
             struct Attributes
@@ -109,6 +115,22 @@ Shader "IslandUV/Debug/IslandIdGradient"
                 float2 uv = IN.uv;
 
                 uint islandId = DecodeIslandIdFromColor(IN.color);
+
+                if (_HighlightIgnored > 0.5 && islandId == 0xFFFF)
+                {
+                    // Still apply UV gradient so you can see which UV channel is active.
+                    float tIgnored;
+                    if (_GradAxis < 0.5) tIgnored = frac(uv.x);
+                    else if (_GradAxis < 1.5) tIgnored = frac(uv.y);
+                    else
+                    {
+                        float2 d = frac(uv) - 0.5;
+                        tIgnored = saturate(length(d) * 2.0);
+                    }
+
+                    float3 shadeIgnored = lerp(_Light.rgb, _Dark.rgb, tIgnored);
+                    return half4(_IgnoredColor.rgb * shadeIgnored, 1);
+                }
                 float idf = (float)islandId;
 
                 // Generate a stable per-island base color.

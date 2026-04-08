@@ -92,8 +92,9 @@ public static class IslandUvMeshProcessor
         if (settings.writeIslandIdToVertexColor)
         {
             // 16-bit islandId packing into Color32 (little endian): id = r + g*256
+            // For ignored islands, we use a fixed sentinel value 0xFFFF (65535), which is the unsigned equivalent of -1.
             // Note: if islandCount can exceed 65535 in the future, upgrade packing (e.g. RGB 24-bit).
-            ushort id16 = (ushort)Mathf.Clamp(islandId, 0, 65535);
+            ushort id16 = ignoredIsland ? (ushort)0xFFFF : (ushort)Mathf.Clamp(islandId, 0, 65534);
             byte r = (byte)(id16 & 0xFF);
             byte g = (byte)((id16 >> 8) & 0xFF);
             newColors.Add(new Color32(r, g, 0, 255));
@@ -103,12 +104,12 @@ public static class IslandUvMeshProcessor
         Vector3 p = vPos - islandBasis.origin;
         Vector2 uv = new Vector2(Vector3.Dot(p, islandBasis.T), Vector3.Dot(p, islandBasis.B));
 
-    // 第二步：归一化到 [0,1]
-    // 注意：uvMin/uvMax 已在前面步骤计算完成
-    Vector2 size = islandBasis.uvMax - islandBasis.uvMin;
-    uv = uv - islandBasis.uvMin; // 平移到原点
-    if (Mathf.Abs(size.x) > 1e-6f) uv.x /= size.x;
-    if (Mathf.Abs(size.y) > 1e-6f) uv.y /= size.y;
+        // 第二步：归一化到 [0,1]
+        // 注意：uvMin/uvMax 已在前面步骤计算完成
+        Vector2 size = islandBasis.uvMax - islandBasis.uvMin;
+        uv = uv - islandBasis.uvMin; // 平移到原点
+        if (Mathf.Abs(size.x) > 1e-6f) uv.x /= size.x;
+        if (Mathf.Abs(size.y) > 1e-6f) uv.y /= size.y;
 
         // 小岛忽略：写入固定 UV
         if (ignoredIsland)
@@ -324,10 +325,10 @@ public static class IslandUvMeshProcessor
         var islandVerSum = new Vector3[islandCount];
         var islandVerCount = new int[islandCount];
 
-    // Small island metrics
-    var islandTriCount = new int[islandCount];
-    var islandArea = new float[islandCount];
-    float totalArea = 0f;
+        // Small island metrics
+        var islandTriCount = new int[islandCount];
+        var islandArea = new float[islandCount];
+        float totalArea = 0f;
 
         // accumulate normal and vertex positions
         for (int i = 0; i < triCount; i++)
@@ -412,7 +413,7 @@ public static class IslandUvMeshProcessor
         var newVertices = new List<Vector3>(vertices.Length);
         var newNormals = new List<Vector3>(vertices.Length);
         var newTextUV = new List<Vector2>(vertices.Length);
-    var newColors = s.writeIslandIdToVertexColor ? new List<Color32>(vertices.Length) : null;
+        var newColors = s.writeIslandIdToVertexColor ? new List<Color32>(vertices.Length) : null;
 
         // srcNormals / hasNormals are computed earlier (used both for clustering normals and for output normal copying).
 
