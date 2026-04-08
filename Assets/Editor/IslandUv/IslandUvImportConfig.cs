@@ -22,15 +22,16 @@ public class IslandUvImportConfig : ScriptableObject
         [Header("General")]
         public bool enabled = true;
 
-        [Tooltip("法线夹角阈值（degrees）。相邻三角面法线夹角 <= 阈值则归为同一Island。")]
+        [Tooltip("法线夹角阈值（degrees）。相邻三角面法线夹角 <= 阈值则归为同一 Island。")]
         [Range(0f, 90f)]
         public float normalAngleThresholdDeg = 25f;
 
-        [Tooltip("写入 TextUV 的 UV 通道（0..7 => UV0..UV7 / TEXCOORD0..7）。建议用 2（UV2）。")]
+        [Tooltip("写入 TextUV 的 UV 通道。")]
         [Range(0, 7)]
         public int targetUvChannel = 2;
 
         [Tooltip("是否进行按 Island 的顶点拆分。")]
+        [HideInInspector]
         public bool splitVertices = true;
 
         /* [Header("TextUV Mapping")]
@@ -38,12 +39,13 @@ public class IslandUvImportConfig : ScriptableObject
         public float tileWorldSize = 1.0f; */
 
         [Tooltip("是否把投影坐标归一化到 [0,1] 范围。")]
-        public bool normalizePerIsland = false;
+        public bool normalizeUv = false;
     }
 
+    public Settings defaultSettings = new();
     public List<Entry> entries = new();
 
-    public Settings? LoadSettings(string guid)
+    public Settings LoadSettings(string guid)
     {
         foreach (var entry in entries)
         {
@@ -57,7 +59,7 @@ public class IslandUvImportConfig : ScriptableObject
             }
         }
 
-        return null;
+        return defaultSettings;
     }
 }
 #endif

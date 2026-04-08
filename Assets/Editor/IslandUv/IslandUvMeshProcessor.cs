@@ -48,7 +48,7 @@ public static class IslandUvMeshProcessor
         int originalV,
         int islandId,
         IslandBasis islandBasis,
-        bool normalizePerBlock,
+        bool normalizeUv,
         Vector3[] vertices,
         Vector3[] srcNormals,
         bool hasNormals,
@@ -80,7 +80,7 @@ public static class IslandUvMeshProcessor
 
         // 第二步：应用归一化（如果启用）
         // 注意：此时 uvMin/uvMax 已在前面步骤计算完成
-        if (normalizePerBlock)
+        if (normalizeUv)
         {
             Vector2 size = islandBasis.uvMax - islandBasis.uvMin;
             uv = uv - islandBasis.uvMin;  // 平移到原点
@@ -273,9 +273,9 @@ public static class IslandUvMeshProcessor
             int i1 = tris[i].i1;
             int i2 = tris[i].i2;
 
-            int o0 = GetOrCreateVertex(i0, iid, basis, s.normalizePerIsland, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
-            int o1 = GetOrCreateVertex(i1, iid, basis, s.normalizePerIsland, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
-            int o2 = GetOrCreateVertex(i2, iid, basis, s.normalizePerIsland, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o0 = GetOrCreateVertex(i0, iid, basis, s.normalizeUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o1 = GetOrCreateVertex(i1, iid, basis, s.normalizeUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o2 = GetOrCreateVertex(i2, iid, basis, s.normalizeUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
 
             newTriangles[i * 3] = o0;
             newTriangles[i * 3 + 1] = o1;

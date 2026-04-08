@@ -10,18 +10,17 @@ public static class IslandUvImportConfigAsset
     {
         get
         {
-            if (_instance == null)
+            if (_instance != null) return _instance;
+
+            string[] guids = AssetDatabase.FindAssets("t:IslandUvImportConfig");
+            if (guids != null && guids.Length > 0)
             {
-                string[] guids = AssetDatabase.FindAssets("t:IslandUvImportConfig");
-                if (guids != null && guids.Length > 0)
-                {
-                    string path = AssetDatabase.GUIDToAssetPath(guids[0]);
-                    _instance = AssetDatabase.LoadAssetAtPath<IslandUvImportConfig>(path);
-                }
-                else
-                {
-                    Debug.LogError("IslandUvImportConfig asset not found. Please create one via Assets > Create > Island UV > Import Config.");
-                }
+                string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+                _instance = AssetDatabase.LoadAssetAtPath<IslandUvImportConfig>(path);
+            }
+            else
+            {
+                Debug.LogError("IslandUvImportConfig asset not found. Please create one via Assets > Create > Island UV > Import Config.");
             }
             return _instance;
         }
