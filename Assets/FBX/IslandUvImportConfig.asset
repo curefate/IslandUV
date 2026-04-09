@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp-Editor::IslandUvImportConfig
   defaultSettings:
     enabled: 1
-    normalAngleThresholdDeg: 35
+    normalAngleThresholdDeg: 25
     targetUvChannel: 0
     writeIslandIdToVertexColor: 1
     allowAcrossSubMeshes: 1
