@@ -9,7 +9,7 @@ using UnityEngine;
 [ExecuteAlways]
 public class IslandUvPerRendererOverrides : MonoBehaviour
 {
-    public const string ExpectedShaderName = "IslandUV/Final/IslandOverrides";
+    public const string ExpectedShaderName = "IslandUV/IslandUV_Unlit";
     public const int OverrideSlotCount = 4;
     public const int IdsPerSlot = 4;
 
@@ -21,17 +21,17 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
         [Tooltip("If islandId matches any of these, the override slot is applied.")]
         public ushort[] ids;
 
-    [Header("UV Transform")]
-    public Vector2 tiling;
-    public Vector2 offset;
+        [Header("UV Transform")]
+        public Vector2 tiling;
+        public Vector2 offset;
 
-    [Header("UV Flags")]
-    public bool flipU;
-    public bool flipV;
-    public bool swapUV;
+        [Header("UV Flags")]
+        public bool flipU;
+        public bool flipV;
+        public bool swapUV;
     }
 
-    [Tooltip("Target renderer; if null, will use Renderer on the same GameObject.")]
+    [Tooltip("Target renderer")]
     public Renderer targetRenderer;
 
     [Header("Override slots (X=4, N=4)")]
@@ -79,7 +79,7 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
 
     private void OnValidate()
     {
-    EnsureArrayInitialized();
+        EnsureArrayInitialized();
         Apply();
     }
 
@@ -88,7 +88,7 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
         var r = ResolveRenderer();
         if (r == null) return;
 
-    WarnIfShaderMismatch(r);
+        WarnIfShaderMismatch(r);
 
         if (_mpb == null) _mpb = new MaterialPropertyBlock();
         r.GetPropertyBlock(_mpb);
@@ -143,22 +143,22 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
         string p = $"_Ov{index}_";
 
         mpb.SetFloat(p + "Enabled", slot.enabled ? 1f : 0f);
-    mpb.SetVector(p + "ST", new Vector4(slot.tiling.x, slot.tiling.y, slot.offset.x, slot.offset.y));
+        mpb.SetVector(p + "ST", new Vector4(slot.tiling.x, slot.tiling.y, slot.offset.x, slot.offset.y));
 
-    int flags = 0;
-    if (slot.flipU) flags |= 1;
-    if (slot.flipV) flags |= 2;
-    if (slot.swapUV) flags |= 4;
-    mpb.SetFloat(p + "Flags", flags);
+        int flags = 0;
+        if (slot.flipU) flags |= 1;
+        if (slot.flipV) flags |= 2;
+        if (slot.swapUV) flags |= 4;
+        mpb.SetFloat(p + "Flags", flags);
 
-    // ids[] is fixed-length IdsPerSlot.
-    ushort id0 = (slot.ids != null && slot.ids.Length > 0) ? slot.ids[0] : (ushort)0xFFFF;
-    ushort id1 = (slot.ids != null && slot.ids.Length > 1) ? slot.ids[1] : (ushort)0xFFFF;
-    ushort id2 = (slot.ids != null && slot.ids.Length > 2) ? slot.ids[2] : (ushort)0xFFFF;
-    ushort id3 = (slot.ids != null && slot.ids.Length > 3) ? slot.ids[3] : (ushort)0xFFFF;
-    mpb.SetFloat(p + "Id0", id0);
-    mpb.SetFloat(p + "Id1", id1);
-    mpb.SetFloat(p + "Id2", id2);
-    mpb.SetFloat(p + "Id3", id3);
+        // ids[] is fixed-length IdsPerSlot.
+        ushort id0 = (slot.ids != null && slot.ids.Length > 0) ? slot.ids[0] : (ushort)0xFFFF;
+        ushort id1 = (slot.ids != null && slot.ids.Length > 1) ? slot.ids[1] : (ushort)0xFFFF;
+        ushort id2 = (slot.ids != null && slot.ids.Length > 2) ? slot.ids[2] : (ushort)0xFFFF;
+        ushort id3 = (slot.ids != null && slot.ids.Length > 3) ? slot.ids[3] : (ushort)0xFFFF;
+        mpb.SetFloat(p + "Id0", id0);
+        mpb.SetFloat(p + "Id1", id1);
+        mpb.SetFloat(p + "Id2", id2);
+        mpb.SetFloat(p + "Id3", id3);
     }
 }

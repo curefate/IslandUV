@@ -1,4 +1,4 @@
-Shader "IslandUV/Final/IslandOverrides"
+Shader "IslandUV/IslandUV_Unlit"
 {
     Properties
     {
