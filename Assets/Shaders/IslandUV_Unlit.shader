@@ -8,7 +8,9 @@ Shader "IslandUV/IslandUV_Unlit"
         _BaseMap("Base Map", 2D) = "white" {}
         _BaseColor("Base Color", Color) = (1,1,1,1)
         _Default_ST("Default Tiling/Offset (xy=tiling, zw=offset)", Vector) = (1,1,0,0)
-        _Default_Flags("Default Flags (bit0 flipU, bit1 flipV, bit2 swapUV)", Float) = 0
+        [Toggle] _Default_FlipU("Default Flip U", Float) = 0
+        [Toggle] _Default_FlipV("Default Flip V", Float) = 0
+        [Toggle] _Default_SwapUV("Default Swap UV", Float) = 0
 
         // Ignored islands (id == 0xFFFF)
         _IgnoredColor("Ignored Color", Color) = (0,0,0,1)
@@ -41,13 +43,15 @@ Shader "IslandUV/IslandUV_Unlit"
                 float _UvChannel;
                 float4 _BaseColor;
                 float4 _Default_ST;
-                float _Default_Flags;
+                float _Default_FlipU;
+                float _Default_FlipV;
+                float _Default_SwapUV;
                 float4 _IgnoredColor;
 
-                float _Ov0_Enabled; float4 _Ov0_ST; float _Ov0_Flags; float _Ov0_Id0; float _Ov0_Id1; float _Ov0_Id2; float _Ov0_Id3;
-                float _Ov1_Enabled; float4 _Ov1_ST; float _Ov1_Flags; float _Ov1_Id0; float _Ov1_Id1; float _Ov1_Id2; float _Ov1_Id3;
-                float _Ov2_Enabled; float4 _Ov2_ST; float _Ov2_Flags; float _Ov2_Id0; float _Ov2_Id1; float _Ov2_Id2; float _Ov2_Id3;
-                float _Ov3_Enabled; float4 _Ov3_ST; float _Ov3_Flags; float _Ov3_Id0; float _Ov3_Id1; float _Ov3_Id2; float _Ov3_Id3;
+                float _Ov0_Enabled; float4 _Ov0_ST; float _Ov0_Flags; float _Ov0_FlagsMode; float _Ov0_Id0; float _Ov0_Id1; float _Ov0_Id2; float _Ov0_Id3;
+                float _Ov1_Enabled; float4 _Ov1_ST; float _Ov1_Flags; float _Ov1_FlagsMode; float _Ov1_Id0; float _Ov1_Id1; float _Ov1_Id2; float _Ov1_Id3;
+                float _Ov2_Enabled; float4 _Ov2_ST; float _Ov2_Flags; float _Ov2_FlagsMode; float _Ov2_Id0; float _Ov2_Id1; float _Ov2_Id2; float _Ov2_Id3;
+                float _Ov3_Enabled; float4 _Ov3_ST; float _Ov3_Flags; float _Ov3_FlagsMode; float _Ov3_Id0; float _Ov3_Id1; float _Ov3_Id2; float _Ov3_Id3;
             CBUFFER_END
 
             struct Attributes
@@ -92,6 +96,15 @@ Shader "IslandUV/IslandUV_Unlit"
 
             uint FlagsToUInt(float f) { return (uint)round(f); }
 
+            uint ComposeFlags(float flipU, float flipV, float swapUV)
+            {
+                uint f = 0u;
+                if (flipU > 0.5) f |= 1u;
+                if (flipV > 0.5) f |= 2u;
+                if (swapUV > 0.5) f |= 4u;
+                return f;
+            }
+
             float2 ApplyFlags(float2 uv, uint flags)
             {
                 // bit2 swapUV
@@ -122,6 +135,7 @@ Shader "IslandUV/IslandUV_Unlit"
                 in float enabled,
                 in float4 ovST,
                 in float ovFlags,
+                in float ovFlagsMode,
                 in float id0, in float id1, in float id2, in float id3,
                 inout float4 st,
                 inout uint flags,
@@ -131,7 +145,17 @@ Shader "IslandUV/IslandUV_Unlit"
                 if (enabled <= 0.5) return;
                 if (!MatchId(islandId, id0, id1, id2, id3)) return;
                 st = ovST;
-                flags = FlagsToUInt(ovFlags);
+
+                uint ov = FlagsToUInt(ovFlags);
+                uint mode = (uint)round(ovFlagsMode); // 0=Override, 1=XOR
+                if (mode == 1u)
+                {
+                    flags = flags ^ ov;
+                }
+                else
+                {
+                    flags = ov;
+                }
                 matched = true;
             }
 
@@ -155,13 +179,13 @@ Shader "IslandUV/IslandUV_Unlit"
                 }
 
                 float4 st = _Default_ST;
-                uint flags = FlagsToUInt(_Default_Flags);
+                uint flags = ComposeFlags(_Default_FlipU, _Default_FlipV, _Default_SwapUV);
 
                 bool matched = false;
-                ApplyOverrideIfMatch(islandId, _Ov0_Enabled, _Ov0_ST, _Ov0_Flags, _Ov0_Id0, _Ov0_Id1, _Ov0_Id2, _Ov0_Id3, st, flags, matched);
-                ApplyOverrideIfMatch(islandId, _Ov1_Enabled, _Ov1_ST, _Ov1_Flags, _Ov1_Id0, _Ov1_Id1, _Ov1_Id2, _Ov1_Id3, st, flags, matched);
-                ApplyOverrideIfMatch(islandId, _Ov2_Enabled, _Ov2_ST, _Ov2_Flags, _Ov2_Id0, _Ov2_Id1, _Ov2_Id2, _Ov2_Id3, st, flags, matched);
-                ApplyOverrideIfMatch(islandId, _Ov3_Enabled, _Ov3_ST, _Ov3_Flags, _Ov3_Id0, _Ov3_Id1, _Ov3_Id2, _Ov3_Id3, st, flags, matched);
+                ApplyOverrideIfMatch(islandId, _Ov0_Enabled, _Ov0_ST, _Ov0_Flags, _Ov0_FlagsMode, _Ov0_Id0, _Ov0_Id1, _Ov0_Id2, _Ov0_Id3, st, flags, matched);
+                ApplyOverrideIfMatch(islandId, _Ov1_Enabled, _Ov1_ST, _Ov1_Flags, _Ov1_FlagsMode, _Ov1_Id0, _Ov1_Id1, _Ov1_Id2, _Ov1_Id3, st, flags, matched);
+                ApplyOverrideIfMatch(islandId, _Ov2_Enabled, _Ov2_ST, _Ov2_Flags, _Ov2_FlagsMode, _Ov2_Id0, _Ov2_Id1, _Ov2_Id2, _Ov2_Id3, st, flags, matched);
+                ApplyOverrideIfMatch(islandId, _Ov3_Enabled, _Ov3_ST, _Ov3_Flags, _Ov3_FlagsMode, _Ov3_Id0, _Ov3_Id1, _Ov3_Id2, _Ov3_Id3, st, flags, matched);
 
                 float2 uv = IN.uv;
                 uv = ApplyFlags(uv, flags);

@@ -7,11 +7,21 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [ExecuteAlways]
+[RequireComponent(typeof(Renderer))]
 public class IslandUvPerRendererOverrides : MonoBehaviour
 {
-    public const string ExpectedShaderName = "IslandUV/IslandUV_Unlit";
-    public const int OverrideSlotCount = 4;
-    public const int IdsPerSlot = 4;
+    [Tooltip("Target renderer")]
+    public Renderer targetRenderer;
+
+    [Tooltip("Override slots (X=4, N=4)")]
+    public OverrideSlot[] overrides = Array.Empty<OverrideSlot>();
+
+    [Serializable]
+    public enum FlagsMode
+    {
+        Override = 0,
+        XOR = 1,
+    }
 
     [Serializable]
     public struct OverrideSlot
@@ -26,52 +36,47 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
         public Vector2 offset;
 
         [Header("UV Flags")]
+        [Tooltip("How this slot applies its UV flags (Override = replace, XOR = toggle bits against the material default flags).")]
+        public FlagsMode flagsMode;
         public bool flipU;
         public bool flipV;
         public bool swapUV;
-    }
 
-    [Tooltip("Target renderer")]
-    public Renderer targetRenderer;
-
-    [Header("Override slots (X=4, N=4)")]
-    public OverrideSlot[] overrides = Array.Empty<OverrideSlot>();
-
-    [Tooltip("If enabled, clears the property block when the component is disabled.")]
-    public bool clearOnDisable = false;
-
-    private static OverrideSlot NewDefaultSlot()
-    {
-        return new OverrideSlot
+        public static OverrideSlot NewDefault()
         {
-            enabled = false,
-            ids = new ushort[IdsPerSlot] { 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF },
-            tiling = Vector2.one,
-            offset = Vector2.zero,
-            flipU = false,
-            flipV = false,
-            swapUV = false,
-        };
+            return new OverrideSlot
+            {
+                enabled = false,
+                ids = new ushort[IdsPerSlot] { MaxId, MaxId, MaxId, MaxId },
+                tiling = Vector2.one,
+                offset = Vector2.zero,
+                flagsMode = FlagsMode.Override,
+                flipU = false,
+                flipV = false,
+                swapUV = false,
+            };
+        }
     }
 
+    private const string ExpectedShaderName = "IslandUV/IslandUV_Unlit";
+    private const int OverrideSlotCount = 4;
+    private const int IdsPerSlot = 4;
+    private const ushort MaxId = ushort.MaxValue; // 0xFFFF
     private MaterialPropertyBlock _mpb;
 
     private void Reset()
     {
-        EnsureArrayInitialized();
         if (targetRenderer == null) targetRenderer = GetComponent<Renderer>();
         Apply();
     }
 
     private void OnEnable()
     {
-        EnsureArrayInitialized();
         Apply();
     }
 
     private void OnDisable()
     {
-        if (!clearOnDisable) return;
         var r = ResolveRenderer();
         if (r == null) return;
         r.SetPropertyBlock(null);
@@ -79,24 +84,25 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
 
     private void OnValidate()
     {
-        EnsureArrayInitialized();
         Apply();
     }
 
-    public void Apply()
+    private void Apply()
     {
         var r = ResolveRenderer();
         if (r == null) return;
 
         WarnIfShaderMismatch(r);
 
-        if (_mpb == null) _mpb = new MaterialPropertyBlock();
+        EnsureArrayInitialized();
+
+        _mpb ??= new MaterialPropertyBlock();
         r.GetPropertyBlock(_mpb);
 
         int count = overrides != null ? overrides.Length : 0;
         for (int i = 0; i < OverrideSlotCount; i++)
         {
-            var slot = (i < count) ? overrides[i] : NewDefaultSlot();
+            var slot = (i < count) ? overrides[i] : OverrideSlot.NewDefault();
             SetSlot(_mpb, i, slot);
         }
 
@@ -107,22 +113,6 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
     {
         if (targetRenderer != null) return targetRenderer;
         return GetComponent<Renderer>();
-    }
-
-    private void EnsureArrayInitialized()
-    {
-        if (overrides == null || overrides.Length != OverrideSlotCount)
-        {
-            overrides = new OverrideSlot[OverrideSlotCount];
-            for (int i = 0; i < OverrideSlotCount; i++) overrides[i] = NewDefaultSlot();
-        }
-
-        // Ensure each slot has an ids array.
-        for (int i = 0; i < overrides.Length; i++)
-        {
-            if (overrides[i].ids == null || overrides[i].ids.Length != IdsPerSlot)
-                overrides[i].ids = new ushort[IdsPerSlot] { 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF };
-        }
     }
 
     private static void WarnIfShaderMismatch(Renderer r)
@@ -151,6 +141,9 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
         if (slot.swapUV) flags |= 4;
         mpb.SetFloat(p + "Flags", flags);
 
+        // 0 = Override, 1 = XOR
+        mpb.SetFloat(p + "FlagsMode", (float)slot.flagsMode);
+
         // ids[] is fixed-length IdsPerSlot.
         ushort id0 = (slot.ids != null && slot.ids.Length > 0) ? slot.ids[0] : (ushort)0xFFFF;
         ushort id1 = (slot.ids != null && slot.ids.Length > 1) ? slot.ids[1] : (ushort)0xFFFF;
@@ -160,5 +153,21 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
         mpb.SetFloat(p + "Id1", id1);
         mpb.SetFloat(p + "Id2", id2);
         mpb.SetFloat(p + "Id3", id3);
+    }
+
+    private void EnsureArrayInitialized()
+    {
+        if (overrides == null || overrides.Length != OverrideSlotCount)
+        {
+            overrides = new OverrideSlot[OverrideSlotCount];
+            for (int i = 0; i < OverrideSlotCount; i++) overrides[i] = OverrideSlot.NewDefault();
+        }
+
+        // Ensure each slot has an ids array.
+        for (int i = 0; i < overrides.Length; i++)
+        {
+            if (overrides[i].ids == null || overrides[i].ids.Length != IdsPerSlot)
+                overrides[i].ids = new ushort[IdsPerSlot] { MaxId, MaxId, MaxId, MaxId };
+        }
     }
 }

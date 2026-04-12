@@ -828,16 +828,10 @@ MonoBehaviour:
   targetRenderer: {fileID: 2125972933}
   overrides:
   - enabled: 1
-    ids: 12001b00ffffffff
+    ids: 1200ffffffffffff
     tiling: {x: 1, y: 1}
     offset: {x: 0, y: 0}
-    flipU: 1
-    flipV: 0
-    swapUV: 0
-  - enabled: 1
-    ids: 1500ffffffffffff
-    tiling: {x: 1, y: 15}
-    offset: {x: 0, y: 0}
+    flagsMode: 1
     flipU: 0
     flipV: 0
     swapUV: 0
@@ -845,6 +839,7 @@ MonoBehaviour:
     ids: ffffffffffffffff
     tiling: {x: 1, y: 1}
     offset: {x: 0, y: 0}
+    flagsMode: 0
     flipU: 0
     flipV: 0
     swapUV: 0
@@ -852,10 +847,18 @@ MonoBehaviour:
     ids: ffffffffffffffff
     tiling: {x: 1, y: 1}
     offset: {x: 0, y: 0}
+    flagsMode: 0
     flipU: 0
     flipV: 0
     swapUV: 0
-  clearOnDisable: 0
+  - enabled: 0
+    ids: ffffffffffffffff
+    tiling: {x: 1, y: 1}
+    offset: {x: 0, y: 0}
+    flagsMode: 0
+    flipU: 0
+    flipV: 0
+    swapUV: 0
 --- !u!1001 &2145231015
 PrefabInstance:
   m_ObjectHideFlags: 0
