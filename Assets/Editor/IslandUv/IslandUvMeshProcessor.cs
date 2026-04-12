@@ -65,7 +65,6 @@ public static class IslandUvMeshProcessor
         int islandId,
         IslandBasis islandBasis,
     bool ignoredIsland,
-    Vector2 ignoredUv,
         Vector3[] vertices,
         Vector3[] srcNormals,
         bool hasNormals,
@@ -97,20 +96,18 @@ public static class IslandUvMeshProcessor
         byte g = (byte)((id16 >> 8) & 0xFF);
         newColors.Add(new Color32(r, g, 0, 255));
 
-        // 第一步：计算投影坐标
+        // Project to island plane (T/B)
         Vector3 p = vPos - islandBasis.origin;
         Vector2 uv = new Vector2(Vector3.Dot(p, islandBasis.T), Vector3.Dot(p, islandBasis.B));
 
-        // 第二步：归一化到 [0,1]
-        // 注意：uvMin/uvMax 已在前面步骤计算完成
+        // Normalize to [0,1] within this island bounds.
         Vector2 size = islandBasis.uvMax - islandBasis.uvMin;
-        uv = uv - islandBasis.uvMin; // 平移到原点
+        uv = uv - islandBasis.uvMin;
         if (Mathf.Abs(size.x) > 1e-6f) uv.x /= size.x;
         if (Mathf.Abs(size.y) > 1e-6f) uv.y /= size.y;
 
-        // 小岛忽略：写入固定 UV
-        if (ignoredIsland)
-            uv = ignoredUv;
+        // Ignored islands: write fixed UV (0,0)
+        if (ignoredIsland) uv = Vector2.zero;
 
         newTextUV.Add(uv);
 
@@ -430,11 +427,10 @@ public static class IslandUvMeshProcessor
             int i2 = tris[i].i2;
 
             bool isIgnored = ignoredIsland[iid];
-            Vector2 fixedUv = Vector2.zero;
 
-            int o0 = GetOrCreateVertex(i0, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
-            int o1 = GetOrCreateVertex(i1, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
-            int o2 = GetOrCreateVertex(i2, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
+            int o0 = GetOrCreateVertex(i0, iid, basis, isIgnored, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
+            int o1 = GetOrCreateVertex(i1, iid, basis, isIgnored, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
+            int o2 = GetOrCreateVertex(i2, iid, basis, isIgnored, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
 
             newTrianglesBySubMesh[tris[i].subMesh].Add(o0);
             newTrianglesBySubMesh[tris[i].subMesh].Add(o1);

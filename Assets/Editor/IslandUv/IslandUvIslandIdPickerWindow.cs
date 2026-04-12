@@ -19,7 +19,6 @@ public class IslandUvIslandIdPickerWindow : EditorWindow
     {
         EditorGUILayout.HelpBox(
             "Click a mesh in Scene View to read its islandId encoded in vertex color (R/G).\n" +
-            "Requires: IslandUvImportConfig.Settings.writeIslandIdToVertexColor = true.\n" +
             "Ignored islands use id=65535 (0xFFFF).",
             MessageType.Info);
 
@@ -73,12 +72,9 @@ public class IslandUvIslandIdPickerWindow : EditorWindow
             }
         }
 
-        // Fallback: try MeshFilter/SkinnedMeshRenderer mesh, but we can’t map triangleIndex reliably without MeshCollider.
-        // Still, we can attempt if collider mesh equals filter mesh; otherwise we warn.
+        // Fallback: we require a MeshCollider to get a stable triangleIndex.
         var mf = go.GetComponent<MeshFilter>();
-        var smr = go.GetComponent<SkinnedMeshRenderer>();
-        Mesh m = mf != null ? mf.sharedMesh : (smr != null ? smr.sharedMesh : null);
-        if (m != null)
+        if (mf != null && mf.sharedMesh != null)
         {
             Debug.LogWarning(
                 $"[IslandUV] Hit '{go.name}' but collider is not a MeshCollider with a readable mesh. Add a MeshCollider to enable islandId picking.",
