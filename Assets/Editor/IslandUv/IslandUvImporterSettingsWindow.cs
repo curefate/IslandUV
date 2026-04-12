@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
+using Unity.Plastic.Newtonsoft.Json;
 
 public class IslandUvImporterSettingsWindow : EditorWindow
 {
@@ -14,8 +15,7 @@ public class IslandUvImporterSettingsWindow : EditorWindow
     private string _status;
 
     // --- IslandId Picker (SceneView) ---
-    private bool _pickerEnabled = true;
-    private bool _pickerCopyToClipboard = true;
+    private IslandUvIslandIdPickerTool _picker;
 
     [MenuItem("Tools/Island UV/Importer Settings")]
     public static void Open()
@@ -28,14 +28,19 @@ public class IslandUvImporterSettingsWindow : EditorWindow
         RefreshFromSelection();
         Selection.selectionChanged += OnSelectionChanged;
 
-        SceneView.duringSceneGui += DuringSceneGui;
+        _picker = new IslandUvIslandIdPickerTool(OnPickedIslandId);
+        _picker.Attach();
     }
 
     private void OnDisable()
     {
         Selection.selectionChanged -= OnSelectionChanged;
 
-        SceneView.duringSceneGui -= DuringSceneGui;
+        if (_picker != null)
+        {
+            _picker.Detach();
+            _picker = null;
+        }
     }
 
     private void OnSelectionChanged()
@@ -81,25 +86,14 @@ public class IslandUvImporterSettingsWindow : EditorWindow
         }
 
         IslandUvImporterSettings.TryGetSettings(_importer, out _applied, out _usedDefault);
-        _editing = Clone(_applied);
+        _editing = DeepCopy(_applied);
     }
 
-    private static IslandUvSettings.Settings Clone(IslandUvSettings.Settings s)
+    private static IslandUvSettings.Settings DeepCopy(IslandUvSettings.Settings s)
     {
         if (s == null) return null;
-        return new IslandUvSettings.Settings
-        {
-            enabled = s.enabled,
-            thresholdDeg = s.thresholdDeg,
-            targetUvChannel = s.targetUvChannel,
-            allowAcrossSubMeshes = s.allowAcrossSubMeshes,
-            normalSource = s.normalSource,
-            propagation = s.propagation,
-            ignoreSmall = s.ignoreSmall,
-            smallIsland = s.smallIsland,
-            minIslandTris = s.minIslandTris,
-            minIslandAreaRatio = s.minIslandAreaRatio,
-        };
+        // Keep it simple and future-proof: if fields change, we don't need to update this method.
+        return JsonConvert.DeserializeObject<IslandUvSettings.Settings>(JsonConvert.SerializeObject(s));
     }
 
     private void OnGUI()
@@ -151,7 +145,7 @@ public class IslandUvImporterSettingsWindow : EditorWindow
             GUI.enabled = isDirty;
             if (GUILayout.Button("Revert", GUILayout.Width(100)))
             {
-                _editing = Clone(_applied);
+                _editing = DeepCopy(_applied);
                 _status = "Reverted.";
             }
             if (GUILayout.Button("Apply", GUILayout.Width(100)))
@@ -168,30 +162,50 @@ public class IslandUvImporterSettingsWindow : EditorWindow
     private static void DrawSettings(IslandUvSettings.Settings s)
     {
         EditorGUILayout.Space(6);
-        s.enabled = EditorGUILayout.ToggleLeft("Enabled", s.enabled);
+        s.enabled = EditorGUILayout.ToggleLeft(new GUIContent(
+            "Enabled",
+            "Enable IslandUV processing for this model importer."), s.enabled);
 
         using (new EditorGUI.DisabledScope(!s.enabled))
         {
-            s.thresholdDeg = EditorGUILayout.Slider("Threshold (deg)", s.thresholdDeg, 0f, 90f);
-            s.targetUvChannel = EditorGUILayout.IntSlider("Target UV Channel", s.targetUvChannel, 0, 7);
-            s.allowAcrossSubMeshes = EditorGUILayout.Toggle("Allow Across SubMeshes", s.allowAcrossSubMeshes);
+            s.thresholdDeg = EditorGUILayout.Slider(new GUIContent(
+                "Threshold (deg)",
+                "Angle threshold (degrees) used to split triangles into islands."), s.thresholdDeg, 0f, 90f);
+            s.targetUvChannel = EditorGUILayout.IntSlider(new GUIContent(
+                "Target UV Channel",
+                "UV channel index to write results to (0..7)."), s.targetUvChannel, 0, 7);
+            s.allowAcrossSubMeshes = EditorGUILayout.Toggle(new GUIContent(
+                "Allow Across SubMeshes",
+                "Allow UVs to span across multiple sub-meshes."), s.allowAcrossSubMeshes);
 
             EditorGUILayout.Space(6);
-            s.normalSource = (IslandUvSettings.NormalSource)EditorGUILayout.EnumPopup("Normal Source", s.normalSource);
-            s.propagation = (IslandUvSettings.Propagation)EditorGUILayout.EnumPopup("Propagation", s.propagation);
+            s.normalSource = (IslandUvSettings.NormalSource)EditorGUILayout.EnumPopup(new GUIContent(
+                "Normal Source",
+                "Source of normals for UV mapping. Face = front face normals, Vertex = average of 3 vertex normals."), s.normalSource);
+            s.propagation = (IslandUvSettings.Propagation)EditorGUILayout.EnumPopup(new GUIContent(
+                "Propagation",
+                "How UVs are propagated across the mesh. Local = allow chaining, Island = derive from normal of island."), s.propagation);
 
             EditorGUILayout.Space(6);
-            s.ignoreSmall = EditorGUILayout.Toggle("Ignore Small Islands", s.ignoreSmall);
+            s.ignoreSmall = EditorGUILayout.Toggle(new GUIContent(
+                "Ignore Small Islands",
+                "If enabled, small islands are ignored and will use islandId=0xFFFF (65535) and UV=(0,0)."), s.ignoreSmall);
             using (new EditorGUI.DisabledScope(!s.ignoreSmall))
             {
-                s.smallIsland = (IslandUvSettings.SmallIsland)EditorGUILayout.EnumPopup("Small Island Mode", s.smallIsland);
+                s.smallIsland = (IslandUvSettings.SmallIsland)EditorGUILayout.EnumPopup(new GUIContent(
+                    "Small Island Mode",
+                    "How 'small' is evaluated: by triangle count or by estimated area ratio."), s.smallIsland);
                 if (s.smallIsland == IslandUvSettings.SmallIsland.TriCount)
                 {
-                    s.minIslandTris = Mathf.Max(0, EditorGUILayout.IntField("Min Island Tris", s.minIslandTris));
+                    s.minIslandTris = Mathf.Max(0, EditorGUILayout.IntField(new GUIContent(
+                        "Min Island Tris",
+                        "Islands with fewer triangles than this value will be ignored."), s.minIslandTris));
                 }
                 else
                 {
-                    s.minIslandAreaRatio = EditorGUILayout.Slider("Min Area Ratio", s.minIslandAreaRatio, 0f, 1f);
+                    s.minIslandAreaRatio = EditorGUILayout.Slider(new GUIContent(
+                        "Min Area Ratio",
+                        "Islands with area ratio below this value will be ignored."), s.minIslandAreaRatio, 0f, 1f);
                 }
             }
         }
@@ -202,40 +216,38 @@ public class IslandUvImporterSettingsWindow : EditorWindow
         if (_importer == null || _editing == null)
             return;
 
-        try
-        {
-            IslandUvImporterSettings.SetSettings(_importer, _editing);
-
-            // Reimport only on Apply.
-            _importer.SaveAndReimport();
-
-            IslandUvImporterSettings.TryGetSettings(_importer, out _applied, out _usedDefault);
-            _editing = Clone(_applied);
-            _status = "Applied and reimported.";
-        }
-        catch (System.Exception ex)
-        {
-            _status = "Apply failed: " + ex.Message;
-        }
+        RunImporterAction(
+            action: () => IslandUvImporterSettings.SetSettings(_importer, _editing),
+            successStatus: "Applied and reimported.",
+            failurePrefix: "Apply failed: ");
     }
 
     private void Clear()
     {
         if (_importer == null) return;
 
+        RunImporterAction(
+            action: () => IslandUvImporterSettings.ClearSettings(_importer),
+            successStatus: "Cleared IslandUV userData and reimported.",
+            failurePrefix: "Clear failed: ");
+    }
+
+    private void RunImporterAction(System.Action action, string successStatus, string failurePrefix)
+    {
         try
         {
-            IslandUvImporterSettings.ClearSettings(_importer);
+            action?.Invoke();
+
+            // Reimport only on Apply/Clear.
             _importer.SaveAndReimport();
 
-            // Reset to defaults (no userData IslandUV key)
             IslandUvImporterSettings.TryGetSettings(_importer, out _applied, out _usedDefault);
-            _editing = Clone(_applied);
-            _status = "Cleared IslandUV userData and reimported.";
+            _editing = DeepCopy(_applied);
+            _status = successStatus;
         }
         catch (System.Exception ex)
         {
-            _status = "Clear failed: " + ex.Message;
+            _status = failurePrefix + ex.Message;
         }
     }
 
@@ -248,85 +260,14 @@ public class IslandUvImporterSettingsWindow : EditorWindow
             "Ignored islands use id=65535 (0xFFFF).",
             MessageType.Info);
 
-        _pickerEnabled = EditorGUILayout.ToggleLeft("Enable picking", _pickerEnabled);
-        _pickerCopyToClipboard = EditorGUILayout.ToggleLeft("Copy result to clipboard", _pickerCopyToClipboard);
-    }
-
-    private void DuringSceneGui(SceneView sceneView)
-    {
-        if (!_pickerEnabled) return;
-
-        var e = Event.current;
-        if (e == null) return;
-
-        // Left-click in scene view.
-        if (e.type != EventType.MouseDown || e.button != 0) return;
-
-        // Don’t interfere when user is navigating.
-        if (e.alt) return;
-
-        Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-        if (!Physics.Raycast(ray, out var hit, Mathf.Infinity)) return;
-
-        var go = hit.collider != null ? hit.collider.gameObject : null;
-        if (go == null) return;
-
-        // Require MeshCollider for stable triangleIndex.
-        var mc = hit.collider as MeshCollider;
-        if (mc != null && mc.sharedMesh != null)
+        if (_picker != null)
         {
-            if (TryReadIslandIdFromMeshHit(mc.sharedMesh, hit.triangleIndex, out ushort islandId))
-            {
-                Report(go, islandId);
-                if (_pickerCopyToClipboard) EditorGUIUtility.systemCopyBuffer = islandId.ToString();
-                if (e.control) e.Use();
-                return;
-            }
-        }
-
-        var mf = go.GetComponent<MeshFilter>();
-        if (mf != null && mf.sharedMesh != null)
-        {
-            Debug.LogWarning(
-                $"[IslandUV] Hit '{go.name}' but collider is not a MeshCollider with a readable mesh. Add a MeshCollider to enable islandId picking.",
-                go);
+            _picker.Enabled = EditorGUILayout.ToggleLeft("Enable picking", _picker.Enabled);
+            _picker.CopyToClipboard = EditorGUILayout.ToggleLeft("Copy result to clipboard", _picker.CopyToClipboard);
         }
     }
 
-    private static bool TryReadIslandIdFromMeshHit(Mesh mesh, int triangleIndex, out ushort islandId)
-    {
-        islandId = 0;
-        if (mesh == null) return false;
-        if (triangleIndex < 0) return false;
-
-        var colors = mesh.colors32;
-        if (colors == null || colors.Length != mesh.vertexCount) return false;
-
-        var tris = mesh.triangles;
-        int triStart = triangleIndex * 3;
-        if (tris == null || triStart + 2 >= tris.Length) return false;
-
-        int i0 = tris[triStart];
-        int i1 = tris[triStart + 1];
-        int i2 = tris[triStart + 2];
-
-        // Decode packed id = r + g*256.
-        ushort id0 = (ushort)(colors[i0].r | (colors[i0].g << 8));
-        ushort id1 = (ushort)(colors[i1].r | (colors[i1].g << 8));
-        ushort id2 = (ushort)(colors[i2].r | (colors[i2].g << 8));
-
-        islandId = Majority(id0, id1, id2);
-        return true;
-    }
-
-    private static ushort Majority(ushort a, ushort b, ushort c)
-    {
-        if (a == b || a == c) return a;
-        if (b == c) return b;
-        return a;
-    }
-
-    private static void Report(GameObject go, ushort islandId)
+    private void OnPickedIslandId(GameObject go, ushort islandId)
     {
         string hex = $"0x{islandId:X4}";
         Debug.Log($"[IslandUV] {go.name}: islandId = {islandId} ({hex})", go);

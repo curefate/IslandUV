@@ -34,9 +34,12 @@ public static class IslandUvSettings
         public bool enabled = false;
         [Range(0f, 90f)] public float thresholdDeg = 25f;
         [Range(0, 7)] public int targetUvChannel = 2;
+        [Tooltip("Allow UVs to span across multiple sub-meshes.")]
         public bool allowAcrossSubMeshes = true;
 
+        [Tooltip("Source of normals for UV mapping. Face = front face normals, Vertex = average of 3 vertex normals.")]
         public NormalSource normalSource = NormalSource.Vertex;
+        [Tooltip("How UVs are propagated across the mesh. Local = allow chaining, Island = derive from normal of island.")]
         public Propagation propagation = Propagation.Local;
 
         public bool ignoreSmall = false;
