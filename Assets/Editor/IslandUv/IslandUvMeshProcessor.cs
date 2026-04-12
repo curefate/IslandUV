@@ -89,16 +89,13 @@ public static class IslandUvMeshProcessor
         if (hasNormals)
             newNormals.Add(srcNormals[originalV]);
 
-        if (settings.writeIslandIdToVertexColor)
-        {
-            // 16-bit islandId packing into Color32 (little endian): id = r + g*256
-            // For ignored islands, we use a fixed sentinel value 0xFFFF (65535), which is the unsigned equivalent of -1.
-            // Note: if islandCount can exceed 65535 in the future, upgrade packing (e.g. RGB 24-bit).
-            ushort id16 = ignoredIsland ? (ushort)0xFFFF : (ushort)Mathf.Clamp(islandId, 0, 65534);
-            byte r = (byte)(id16 & 0xFF);
-            byte g = (byte)((id16 >> 8) & 0xFF);
-            newColors.Add(new Color32(r, g, 0, 255));
-        }
+        // 16-bit islandId packing into Color32 (little endian): id = r + g*256
+        // For ignored islands, we use a fixed sentinel value 0xFFFF (65535), which is the unsigned equivalent of -1.
+        // Note: if islandCount can exceed 65535 in the future, upgrade packing (e.g. RGB 24-bit).
+        ushort id16 = ignoredIsland ? (ushort)0xFFFF : (ushort)Mathf.Clamp(islandId, 0, 65534);
+        byte r = (byte)(id16 & 0xFF);
+        byte g = (byte)((id16 >> 8) & 0xFF);
+        newColors.Add(new Color32(r, g, 0, 255));
 
         // 第一步：计算投影坐标
         Vector3 p = vPos - islandBasis.origin;
@@ -262,7 +259,7 @@ public static class IslandUvMeshProcessor
         }
 
         // 4) Cluster triangles into islands
-        float cosThreshold = Mathf.Cos(s.normalAngleThresholdDeg * Mathf.Deg2Rad);
+        float cosThreshold = Mathf.Cos(s.thresholdDeg * Mathf.Deg2Rad);
         var triIsland = new int[triCount];
         Array.Fill(triIsland, -1);
 
@@ -413,7 +410,7 @@ public static class IslandUvMeshProcessor
         var newVertices = new List<Vector3>(vertices.Length);
         var newNormals = new List<Vector3>(vertices.Length);
         var newTextUV = new List<Vector2>(vertices.Length);
-        var newColors = s.writeIslandIdToVertexColor ? new List<Color32>(vertices.Length) : null;
+        var newColors = new List<Color32>(vertices.Length);
 
         // srcNormals / hasNormals are computed earlier (used both for clustering normals and for output normal copying).
 
@@ -433,7 +430,7 @@ public static class IslandUvMeshProcessor
             int i2 = tris[i].i2;
 
             bool isIgnored = ignoredIsland[iid];
-            Vector2 fixedUv = s.ignoredUv;
+            Vector2 fixedUv = Vector2.zero;
 
             int o0 = GetOrCreateVertex(i0, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
             int o1 = GetOrCreateVertex(i1, iid, basis, isIgnored, fixedUv, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
@@ -455,8 +452,7 @@ public static class IslandUvMeshProcessor
         if (hasNormals) mesh.SetNormals(newNormals);
         else mesh.RecalculateNormals();
 
-        if (s.writeIslandIdToVertexColor)
-            mesh.SetColors(newColors);
+        mesh.SetColors(newColors);
 
         mesh.subMeshCount = subMeshCount;
         for (int sm = 0; sm < subMeshCount; sm++)

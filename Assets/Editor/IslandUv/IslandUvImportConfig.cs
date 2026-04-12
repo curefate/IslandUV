@@ -41,27 +41,13 @@ public class IslandUvImportConfig : ScriptableObject
         public bool enabled = true;
 
         [Range(0f, 90f)]
-        public float normalAngleThresholdDeg = 25f;
+        public float thresholdDeg = 25f;
 
         [Range(0, 7)]
         public int targetUvChannel = 2;
 
-        [Tooltip("是否把 IslandId 写入顶点色（Color32）。启用后：R/G 编码 16-bit islandId（id = R + G*256），B=0，A=255。便于 shader 进行 per-island 配置。")]
-        public bool writeIslandIdToVertexColor = true;
-
         [Tooltip("是否允许跨 SubMesh 进行相邻三角形连通（影响 Island 聚类）。默认开启：忽略材质分组，仅按几何相邻+法线阈值聚类。")]
         public bool allowAcrossSubMeshes = true;
-
-        /* [Tooltip("是否进行按 Island 的顶点拆分。")]
-        [HideInInspector]
-        public bool splitVertices = true; */
-
-        /* [Header("TextUV Mapping")]
-        [Tooltip("每个 Island 的平面投影 TextUV 缩放：数值越大 => 文字 tile 越大（UV 变化越慢）。")]
-        public float tileWorldSize = 1.0f; */
-
-        /* [Tooltip("是否把投影坐标归一化到 [0,1] 范围。")]
-        public bool normalizeUv = false; */
 
         [Header("Island")]
         [Tooltip("相邻三角形夹角判断使用的法线来源：Face=几何面法线；Vertex=三角形三个顶点法线平均后的方向（更贴近渲染的平滑/硬边）。若 Mesh 无顶点法线，将自动回退到 Face 并给出警告。")]
@@ -84,9 +70,6 @@ public class IslandUvImportConfig : ScriptableObject
         [Range(0f, 1f)]
         [Tooltip("当阈值类型为 AreaRatio 时：岛面积/总面积小于该值将被忽略。例如 0.01 表示 1%。")]
         public float minIslandAreaRatio = 0.001f;
-
-        [Tooltip("被忽略的小岛写入的固定 UV。默认 (0,0)。")]
-        public Vector2 ignoredUv = Vector2.zero;
     }
 
     public Settings defaultSettings = new();
