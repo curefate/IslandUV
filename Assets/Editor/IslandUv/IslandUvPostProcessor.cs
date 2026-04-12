@@ -15,9 +15,9 @@ public class IslandUvPostProcessor : AssetPostprocessor
 
     void OnPostprocessModel(GameObject model)
     {
-        string guid = AssetDatabase.AssetPathToGUID(assetPath);
-        var settings = IslandUvImportConfigAsset.Instance.LoadSettings(guid);
-        if (settings == null || !settings.enabled) return;
+    var importer = assetImporter;
+    IslandUvImporterSettings.TryGetSettings(importer, out var settings, out var usedDefault);
+    if (settings == null || !settings.enabled) return;
 
         var mfs = model.GetComponentsInChildren<MeshFilter>(true);
         foreach (var mf in mfs)
@@ -28,8 +28,6 @@ public class IslandUvPostProcessor : AssetPostprocessor
                 IslandUvMeshProcessor.ProcessMesh(mesh, settings);
             }
         }
-
-        Debug.Log($"Processed IslandUV for model: {assetPath}");
     }
 }
 #endif

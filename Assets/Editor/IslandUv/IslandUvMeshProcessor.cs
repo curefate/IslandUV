@@ -70,10 +70,10 @@ public static class IslandUvMeshProcessor
         bool hasNormals,
         List<Vector3> newVertices,
         List<Vector3> newNormals,
-        List<Vector2> newTextUV,
+    List<Vector2> newTextUV,
     List<Color32> newColors,
-        Dictionary<(int v, int i), int> vertexMap,
-        IslandUvImportConfig.Settings settings)
+    Dictionary<(int v, int i), int> vertexMap,
+    IslandUvSettings.Settings settings)
     {
         var key = (originalV, islandId);
         if (vertexMap.TryGetValue(key, out int existing))
@@ -114,7 +114,7 @@ public static class IslandUvMeshProcessor
         return newIndex;
     }
 
-    public static void ProcessMesh(Mesh mesh, IslandUvImportConfig.Settings s)
+    public static void ProcessMesh(Mesh mesh, IslandUvSettings.Settings s)
     {
         if (mesh == null) throw new ArgumentNullException(nameof(mesh));
         if (s == null) throw new ArgumentNullException(nameof(s));
@@ -140,7 +140,7 @@ public static class IslandUvMeshProcessor
         Vector3[] srcNormals = mesh.normals;
         bool hasNormals = srcNormals != null && srcNormals.Length == vertices.Length;
 
-        bool useVertexNormals = (s.normalSource == IslandUvImportConfig.NormalSource.Vertex);
+    bool useVertexNormals = (s.normalSource == IslandUvSettings.NormalSource.Vertex);
         if (useVertexNormals && !hasNormals)
         {
             Debug.LogWarning($"Mesh '{mesh.name}' has no valid vertex normals. Falling back to face normals for IslandUV clustering.");
@@ -263,7 +263,7 @@ public static class IslandUvMeshProcessor
         int islandCount = 0;
         var queue = new Queue<int>();
 
-        bool useIslandRef = (s.propagation == IslandUvImportConfig.Propagation.Island);
+    bool useIslandRef = (s.propagation == IslandUvSettings.Propagation.Island);
         var islandRefNormal = new List<Vector3>(128);
         var islandRefCount = new List<int>(128);
 
@@ -348,7 +348,7 @@ public static class IslandUvMeshProcessor
         var ignoredIsland = new bool[islandCount];
         if (s.ignoreSmall)
         {
-            if (s.smallIsland == IslandUvImportConfig.SmallIsland.TriCount)
+            if (s.smallIsland == IslandUvSettings.SmallIsland.TriCount)
             {
                 int minTris = Mathf.Max(0, s.minIslandTris);
                 for (int i = 0; i < islandCount; i++)
