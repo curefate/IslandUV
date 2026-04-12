@@ -112,6 +112,6 @@ ModelImporter:
   importBlendShapeDeformPercent: 1
   remapMaterialsIfMaterialImportModeIsNone: 0
   additionalBone: 0
-  userData: '{"IslandUV":{"version":1,"enabled":true,"thresholdDeg":25.0,"targetUvChannel":0,"allowAcrossSubMeshes":true,"normalSource":1,"propagation":0,"ignoreSmall":false,"smallIsland":0,"minIslandTris":4,"minIslandAreaRatio":0.0010000000474974514}}'
+  userData: '{"IslandUV":{"version":1,"settings":{"enabled":true,"thresholdDeg":25.0,"targetUvChannel":0,"allowAcrossSubMeshes":true,"normalSource":1,"propagation":0,"ignoreSmall":true,"smallIsland":0,"minIslandTris":4,"minIslandAreaRatio":0.001}}}'
   assetBundleName: 
   assetBundleVariant: 

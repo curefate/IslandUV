@@ -1,7 +1,50 @@
 using System;
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using Unity.Plastic.Newtonsoft.Json;
+using Unity.Plastic.Newtonsoft.Json.Linq;
+
+/// <summary>
+/// Shared IslandUV settings used by importer.userData, postprocessor, and mesh processor.
+/// Editor-only by design (lives under Assets/Editor).
+/// </summary>
+public static class IslandUvSettings
+{
+    public enum NormalSource
+    {
+        Face = 0,
+        Vertex = 1,
+    }
+
+    public enum Propagation
+    {
+        Local = 0,
+        Island = 1,
+    }
+
+    public enum SmallIsland
+    {
+        TriCount = 0,
+        AreaRatio = 1,
+    }
+
+    [Serializable]
+    public class Settings
+    {
+        public bool enabled = false;
+        [Range(0f, 90f)] public float thresholdDeg = 25f;
+        [Range(0, 7)] public int targetUvChannel = 2;
+        public bool allowAcrossSubMeshes = true;
+
+        public NormalSource normalSource = NormalSource.Vertex;
+        public Propagation propagation = Propagation.Local;
+
+        public bool ignoreSmall = false;
+        public SmallIsland smallIsland = SmallIsland.TriCount;
+        [Min(0)] public int minIslandTris = 4;
+        [Range(0f, 1f)] public float minIslandAreaRatio = 0.001f;
+    }
+}
 
 /// <summary>
 /// Read/write IslandUV settings stored in AssetImporter.userData as JSON.
@@ -13,79 +56,7 @@ public static class IslandUvImporterSettings
     public const string RootKey = "IslandUV";
     public const int CurrentVersion = 1;
 
-    [Serializable]
-    private class RootContainer
-    {
-        // Note: JsonUtility can't handle Dictionary. We use a tiny parser for root.
-        public IslandUvContainer IslandUV;
-    }
-
-    [Serializable]
-    private class IslandUvContainer
-    {
-        public int version = CurrentVersion;
-
-    // Mirror of IslandUvSettings.Settings
-        public bool enabled;
-        public float thresholdDeg;
-        public int targetUvChannel;
-        public bool allowAcrossSubMeshes;
-    public IslandUvSettings.NormalSource normalSource;
-    public IslandUvSettings.Propagation propagation;
-        public bool ignoreSmall;
-    public IslandUvSettings.SmallIsland smallIsland;
-        public int minIslandTris;
-        public float minIslandAreaRatio;
-
-    public static IslandUvContainer FromSettings(IslandUvSettings.Settings s)
-        {
-            return new IslandUvContainer
-            {
-                version = CurrentVersion,
-                enabled = s.enabled,
-                thresholdDeg = s.thresholdDeg,
-                targetUvChannel = s.targetUvChannel,
-                allowAcrossSubMeshes = s.allowAcrossSubMeshes,
-                normalSource = s.normalSource,
-                propagation = s.propagation,
-                ignoreSmall = s.ignoreSmall,
-                smallIsland = s.smallIsland,
-                minIslandTris = s.minIslandTris,
-                minIslandAreaRatio = s.minIslandAreaRatio,
-            };
-        }
-
-        public IslandUvSettings.Settings ToSettings()
-        {
-            return new IslandUvSettings.Settings
-            {
-                enabled = enabled,
-                thresholdDeg = thresholdDeg,
-                targetUvChannel = targetUvChannel,
-                allowAcrossSubMeshes = allowAcrossSubMeshes,
-                normalSource = normalSource,
-                propagation = propagation,
-                ignoreSmall = ignoreSmall,
-                smallIsland = smallIsland,
-                minIslandTris = minIslandTris,
-                minIslandAreaRatio = minIslandAreaRatio,
-            };
-        }
-    }
-
-    public static IslandUvSettings.Settings DefaultSettings => new IslandUvSettings.Settings
-    {
-        enabled = false,
-        thresholdDeg = 25f,
-        targetUvChannel = 2,
-        allowAcrossSubMeshes = true,
-        normalSource = IslandUvSettings.NormalSource.Vertex,
-        propagation = IslandUvSettings.Propagation.Local,
-        ignoreSmall = false,
-        smallIsland = IslandUvSettings.SmallIsland.TriCount,
-        minIslandTris = 4,
-        minIslandAreaRatio = 0.001f,
-    };
+    public static IslandUvSettings.Settings DefaultSettings => new IslandUvSettings.Settings();
 
     public static bool TryGetSettings(AssetImporter importer, out IslandUvSettings.Settings settings, out bool usedDefault)
     {
@@ -96,21 +67,33 @@ public static class IslandUvImporterSettings
         string userData = importer.userData;
         if (string.IsNullOrWhiteSpace(userData)) return true;
 
-        // Parse root as a dictionary-ish so we can preserve other keys.
-        if (!TryParseRoot(userData, out var rootMap))
+        if (!TryGetRootObject(userData, out var root))
             return true; // parse failure -> default
 
-        if (!rootMap.TryGetValue(RootKey, out string islandUvJson) || string.IsNullOrWhiteSpace(islandUvJson))
+        var node = root[RootKey];
+        if (node == null || node.Type == JTokenType.Null)
             return true; // missing -> default
 
         try
         {
-            var container = JsonUtility.FromJson<IslandUvContainer>(islandUvJson);
-            if (container == null) return true;
+            if (node is not JObject islandRoot)
+                return true; // unexpected -> default
 
-            // Versioning hook (future)
-            // For now, accept any version >= 1.
-            settings = container.ToSettings();
+            // Schema A:
+            // { "IslandUV": { "version": 1, "settings": { ... } } }
+            // No old-format compatibility by request.
+
+            int version = islandRoot["version"]?.Value<int>() ?? 0;
+            if (version != CurrentVersion)
+                return true; // unsupported version -> default
+
+            if (islandRoot["settings"] is not JObject settingsObj)
+                return true;
+
+            settings = settingsObj.ToObject<IslandUvSettings.Settings>();
+            if (settings == null)
+                return true;
+
             usedDefault = false;
             return true;
         }
@@ -125,17 +108,20 @@ public static class IslandUvImporterSettings
         if (importer == null) throw new ArgumentNullException(nameof(importer));
         if (settings == null) throw new ArgumentNullException(nameof(settings));
 
-        var rootMap = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (!string.IsNullOrWhiteSpace(importer.userData))
+        // Preserve other root keys.
+        if (!TryGetRootObject(importer.userData, out var root))
         {
-            if (TryParseRoot(importer.userData, out var existing))
-                rootMap = existing;
+            // If userData is not valid JSON object, we don't touch it.
+            // This is consistent with previous behavior: parse failure -> defaults and no overwrite.
+            return;
         }
 
-        var container = IslandUvContainer.FromSettings(settings);
-        string islandUvJson = JsonUtility.ToJson(container);
-        rootMap[RootKey] = islandUvJson;
-        importer.userData = BuildRoot(rootMap);
+        root[RootKey] = new JObject
+        {
+            ["version"] = CurrentVersion,
+            ["settings"] = JObject.FromObject(settings),
+        };
+        importer.userData = root.ToString(Formatting.None);
     }
 
     public static void ClearSettings(AssetImporter importer)
@@ -143,14 +129,14 @@ public static class IslandUvImporterSettings
         if (importer == null) throw new ArgumentNullException(nameof(importer));
 
         if (string.IsNullOrWhiteSpace(importer.userData)) return;
-        if (!TryParseRoot(importer.userData, out var rootMap))
-        {
-            // If userData is not a root object we understand, don't touch it.
-            return;
-        }
 
-        if (!rootMap.Remove(RootKey)) return;
-        importer.userData = rootMap.Count == 0 ? string.Empty : BuildRoot(rootMap);
+        if (!TryGetRootObject(importer.userData, out var root))
+            return;
+
+        if (root.Property(RootKey) == null) return;
+        root.Remove(RootKey);
+
+        importer.userData = root.HasValues ? root.ToString(Formatting.None) : string.Empty;
     }
 
     public static bool SettingsEqual(IslandUvSettings.Settings a, IslandUvSettings.Settings b)
@@ -174,227 +160,27 @@ public static class IslandUvImporterSettings
             && feq(a.minIslandAreaRatio, b.minIslandAreaRatio);
     }
 
-    // -----------------
-    // Minimal root JSON handling
-    // -----------------
-
-    // Root format is a JSON object with values that are JSON literals (objects/arrays/strings/numbers).
-    // We only need to read and rewrite root while preserving other keys.
-
-    private static bool TryParseRoot(string json, out Dictionary<string, string> map)
+    private static bool TryGetRootObject(string userData, out JObject root)
     {
-        map = new Dictionary<string, string>(StringComparer.Ordinal);
+        root = null;
+
+        // If empty, treat as a new object we can write into.
+        if (string.IsNullOrWhiteSpace(userData))
+        {
+            root = new JObject();
+            return true;
+        }
+
         try
         {
-            var parser = new RootParser(json);
-            return parser.TryParseObject(map);
+            var token = JToken.Parse(userData);
+            root = token as JObject;
+            return root != null;
         }
         catch
         {
-            map.Clear();
-            return false;
-        }
-    }
-
-    private static string BuildRoot(Dictionary<string, string> map)
-    {
-        // Keep stable ordering for diffs.
-        var keys = new List<string>(map.Keys);
-        keys.Sort(StringComparer.Ordinal);
-
-        var parts = new List<string>(keys.Count);
-        foreach (var k in keys)
-        {
-            string keyJson = JsonUtility.ToJson(new StringWrapper { v = k });
-            // JsonUtility.ToJson wraps as {"v":"..."}. Extract the quoted string.
-            // This avoids writing our own string escaping.
-            string quoted = ExtractQuotedValue(keyJson);
-            parts.Add(quoted + ":" + map[k]);
-        }
-        return "{" + string.Join(",", parts) + "}";
-    }
-
-    [Serializable]
-    private class StringWrapper { public string v; }
-
-    private static string ExtractQuotedValue(string jsonObject)
-    {
-        // jsonObject: {"v":"..."}
-        int colon = jsonObject.IndexOf(':');
-        if (colon < 0) return "\"\"";
-        string after = jsonObject.Substring(colon + 1).Trim();
-        if (after.EndsWith("}")) after = after.Substring(0, after.Length - 1).Trim();
-        return after;
-    }
-
-    private sealed class RootParser
-    {
-        private readonly string _s;
-        private int _i;
-
-        public RootParser(string s)
-        {
-            _s = s ?? string.Empty;
-            _i = 0;
-        }
-
-        public bool TryParseObject(Dictionary<string, string> map)
-        {
-            SkipWs();
-            if (!Consume('{')) return false;
-            SkipWs();
-            if (Consume('}')) return true;
-
-            while (true)
-            {
-                SkipWs();
-                if (!TryParseString(out string key)) return false;
-                SkipWs();
-                if (!Consume(':')) return false;
-                SkipWs();
-                if (!TryParseJsonValue(out string valueLiteral)) return false;
-
-                map[key] = valueLiteral;
-
-                SkipWs();
-                if (Consume('}')) return true;
-                if (!Consume(',')) return false;
-            }
-        }
-
-        private bool TryParseString(out string value)
-        {
-            value = null;
-            if (!Consume('"')) return false;
-            int start = _i;
-            bool escaped = false;
-            var sb = new System.Text.StringBuilder();
-            while (_i < _s.Length)
-            {
-                char c = _s[_i++];
-                if (escaped)
-                {
-                    // Keep it simple: handle common escapes.
-                    switch (c)
-                    {
-                        case '"': sb.Append('"'); break;
-                        case '\\': sb.Append('\\'); break;
-                        case '/': sb.Append('/'); break;
-                        case 'b': sb.Append('\b'); break;
-                        case 'f': sb.Append('\f'); break;
-                        case 'n': sb.Append('\n'); break;
-                        case 'r': sb.Append('\r'); break;
-                        case 't': sb.Append('\t'); break;
-                        case 'u':
-                            if (_i + 4 <= _s.Length)
-                            {
-                                string hex = _s.Substring(_i, 4);
-                                _i += 4;
-                                if (ushort.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out ushort code))
-                                    sb.Append((char)code);
-                            }
-                            break;
-                        default: sb.Append(c); break;
-                    }
-                    escaped = false;
-                    continue;
-                }
-
-                if (c == '\\') { escaped = true; continue; }
-                if (c == '"') { value = sb.ToString(); return true; }
-                sb.Append(c);
-            }
-            return false;
-        }
-
-        private bool TryParseJsonValue(out string literal)
-        {
-            int start = _i;
-            if (_i >= _s.Length) { literal = null; return false; }
-
-            char c = _s[_i];
-            if (c == '{')
-            {
-                if (!ScanBalanced('{', '}', out int end)) { literal = null; return false; }
-                literal = _s.Substring(start, end - start);
-                _i = end;
-                return true;
-            }
-            if (c == '[')
-            {
-                if (!ScanBalanced('[', ']', out int end)) { literal = null; return false; }
-                literal = _s.Substring(start, end - start);
-                _i = end;
-                return true;
-            }
-            if (c == '"')
-            {
-                // scan string including quotes
-                _i++; // consume first quote
-                bool escaped = false;
-                while (_i < _s.Length)
-                {
-                    char ch = _s[_i++];
-                    if (escaped) { escaped = false; continue; }
-                    if (ch == '\\') { escaped = true; continue; }
-                    if (ch == '"') break;
-                }
-                literal = _s.Substring(start, _i - start);
-                return true;
-            }
-
-            // number / true / false / null
-            while (_i < _s.Length)
-            {
-                char ch = _s[_i];
-                if (ch == ',' || ch == '}' || char.IsWhiteSpace(ch)) break;
-                _i++;
-            }
-            literal = _s.Substring(start, _i - start);
-            return !string.IsNullOrWhiteSpace(literal);
-        }
-
-        private bool ScanBalanced(char open, char close, out int endIndex)
-        {
-            int depth = 0;
-            bool inString = false;
-            bool escaped = false;
-            while (_i < _s.Length)
-            {
-                char c = _s[_i++];
-                if (inString)
-                {
-                    if (escaped) { escaped = false; continue; }
-                    if (c == '\\') { escaped = true; continue; }
-                    if (c == '"') { inString = false; continue; }
-                    continue;
-                }
-
-                if (c == '"') { inString = true; continue; }
-
-                if (c == open) depth++;
-                else if (c == close)
-                {
-                    depth--;
-                    if (depth == 0)
-                    {
-                        endIndex = _i;
-                        return true;
-                    }
-                }
-            }
-            endIndex = -1;
-            return false;
-        }
-
-        private void SkipWs()
-        {
-            while (_i < _s.Length && char.IsWhiteSpace(_s[_i])) _i++;
-        }
-
-        private bool Consume(char c)
-        {
-            if (_i < _s.Length && _s[_i] == c) { _i++; return true; }
+            // Don't touch userData we can't parse.
+            root = null;
             return false;
         }
     }
