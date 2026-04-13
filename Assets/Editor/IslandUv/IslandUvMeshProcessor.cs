@@ -82,7 +82,6 @@ public static class IslandUvMeshProcessor
         private Vector3[] _vertices;
         private Vector3[] _srcNormals;
         private bool _hasNormals;
-        private bool _useVertexNormals;
 
         private int _subMeshCount;
         private int[][] _subMeshTriangles;
@@ -154,11 +153,10 @@ public static class IslandUvMeshProcessor
             _srcNormals = _mesh.normals;
             _hasNormals = _srcNormals != null && _srcNormals.Length == _vertices.Length;
 
-            _useVertexNormals = _s.normalSource == IslandUvSettings.NormalSource.Vertex;
-            if (_useVertexNormals && !_hasNormals)
+            // Normal source: vertex normals first (preferred), fall back to face normals if missing.
+            if (!_hasNormals)
             {
                 Debug.LogWarning($"Mesh '{_mesh.name}' has no valid vertex normals. Falling back to face normals for IslandUV clustering.");
-                _useVertexNormals = false;
             }
         }
 
@@ -183,7 +181,7 @@ public static class IslandUvMeshProcessor
                     Vector3 v2 = _vertices[i2];
 
                     Vector3 normal;
-                    if (_useVertexNormals)
+                    if (_hasNormals)
                     {
                         normal = ComputeTriVertexNormal(_srcNormals[i0], _srcNormals[i1], _srcNormals[i2]);
                     }

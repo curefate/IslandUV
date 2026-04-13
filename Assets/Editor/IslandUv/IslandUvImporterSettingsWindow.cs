@@ -179,9 +179,6 @@ public class IslandUvImporterSettingsWindow : EditorWindow
                 "Allow UVs to span across multiple sub-meshes."), s.allowAcrossSubMeshes);
 
             EditorGUILayout.Space(6);
-            s.normalSource = (IslandUvSettings.NormalSource)EditorGUILayout.EnumPopup(new GUIContent(
-                "Normal Source",
-                "Source of normals for UV mapping. Face = front face normals, Vertex = average of 3 vertex normals."), s.normalSource);
             s.propagation = (IslandUvSettings.Propagation)EditorGUILayout.EnumPopup(new GUIContent(
                 "Propagation",
                 "How UVs are propagated across the mesh. Local = allow chaining, Island = derive from normal of island."), s.propagation);

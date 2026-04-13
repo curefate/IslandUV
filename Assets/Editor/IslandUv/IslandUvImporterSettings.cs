@@ -10,12 +10,6 @@ using Unity.Plastic.Newtonsoft.Json.Linq;
 /// </summary>
 public static class IslandUvSettings
 {
-    public enum NormalSource
-    {
-        Face = 0,
-        Vertex = 1,
-    }
-
     public enum Propagation
     {
         Local = 0,
@@ -37,8 +31,6 @@ public static class IslandUvSettings
         [Tooltip("Allow UVs to span across multiple sub-meshes.")]
         public bool allowAcrossSubMeshes = true;
 
-        [Tooltip("Source of normals for UV mapping. Face = front face normals, Vertex = average of 3 vertex normals.")]
-        public NormalSource normalSource = NormalSource.Vertex;
         [Tooltip("How UVs are propagated across the mesh. Local = allow chaining, Island = derive from normal of island.")]
         public Propagation propagation = Propagation.Local;
 
@@ -155,7 +147,6 @@ public static class IslandUvImporterSettings
             && feq(a.thresholdDeg, b.thresholdDeg)
             && a.targetUvChannel == b.targetUvChannel
             && a.allowAcrossSubMeshes == b.allowAcrossSubMeshes
-            && a.normalSource == b.normalSource
             && a.propagation == b.propagation
             && a.ignoreSmall == b.ignoreSmall
             && a.smallIsland == b.smallIsland
