@@ -256,7 +256,8 @@ public class IslandUvImporterSettingsWindow : EditorWindow
         EditorGUILayout.Space(10);
         EditorGUILayout.LabelField("IslandId Picker", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "In Scene View, left-click a MeshCollider to read islandId from vertex color (R/G).\n" +
+            "In Scene View, left-click a MeshCollider to read islandId from UV.zw (two-byte / 16-bit encoding).\n" +
+            "The UV channel is read from the mesh asset's IslandUV importer settings (Target UV Channel).\n" +
             "Ignored islands use id=65535 (0xFFFF).",
             MessageType.Info);
 

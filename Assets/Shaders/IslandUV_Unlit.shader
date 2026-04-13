@@ -2,7 +2,7 @@ Shader "IslandUV/IslandUV_Unlit"
 {
     Properties
     {
-        [Enum(UV0,0, UV1,1, UV2,2, UV3,3, UV4,4, UV5,5, UV6,6, UV7,7)] _UvChannel("UV Channel", Float) = 0
+        [Enum(UV0,0, UV1,1, UV2,2, UV3,3, UV4,4, UV5,5, UV6,6, UV7,7)] _UvChannel("UV Channel", Float) = 2
 
         // Default params (material-level)
         _BaseMap("Base Map", 2D) = "white" {}
@@ -57,25 +57,24 @@ Shader "IslandUV/IslandUV_Unlit"
             struct Attributes
             {
                 float4 positionOS : POSITION;
-                half4 color : COLOR;
-                float2 uv0 : TEXCOORD0;
-                float2 uv1 : TEXCOORD1;
-                float2 uv2 : TEXCOORD2;
-                float2 uv3 : TEXCOORD3;
-                float2 uv4 : TEXCOORD4;
-                float2 uv5 : TEXCOORD5;
-                float2 uv6 : TEXCOORD6;
-                float2 uv7 : TEXCOORD7;
+                float4 uv0 : TEXCOORD0;
+                float4 uv1 : TEXCOORD1;
+                float4 uv2 : TEXCOORD2;
+                float4 uv3 : TEXCOORD3;
+                float4 uv4 : TEXCOORD4;
+                float4 uv5 : TEXCOORD5;
+                float4 uv6 : TEXCOORD6;
+                float4 uv7 : TEXCOORD7;
             };
 
             struct Varyings
             {
                 float4 positionHCS : SV_POSITION;
-                half4 color : COLOR;
                 float2 uv : TEXCOORD0;
+                float2 idZW : TEXCOORD1;
             };
 
-            float2 PickUv(Attributes IN)
+            float4 PickUv4(Attributes IN)
             {
                 if (_UvChannel < 0.5) return IN.uv0;
                 if (_UvChannel < 1.5) return IN.uv1;
@@ -87,11 +86,12 @@ Shader "IslandUV/IslandUV_Unlit"
                 return IN.uv7;
             }
 
-            uint DecodeIslandIdFromColor(half4 c)
+            uint DecodeIslandIdFromZW(float2 zw)
             {
-                uint r = (uint)round(saturate(c.r) * 255.0);
-                uint g = (uint)round(saturate(c.g) * 255.0);
-                return r + (g << 8);
+                // CPU encodes: z = lowByte/255, w = highByte/255
+                uint lo = (uint)round(saturate(zw.x) * 255.0);
+                uint hi = (uint)round(saturate(zw.y) * 255.0);
+                return lo + (hi << 8);
             }
 
             uint FlagsToUInt(float f) { return (uint)round(f); }
@@ -163,14 +163,15 @@ Shader "IslandUV/IslandUV_Unlit"
             {
                 Varyings OUT;
                 OUT.positionHCS = TransformObjectToHClip(IN.positionOS.xyz);
-                OUT.uv = PickUv(IN);
-                OUT.color = IN.color;
+                float4 uv4 = PickUv4(IN);
+                OUT.uv = uv4.xy;
+                OUT.idZW = uv4.zw;
                 return OUT;
             }
 
             half4 frag(Varyings IN) : SV_Target
             {
-                uint islandId = DecodeIslandIdFromColor(IN.color);
+                uint islandId = DecodeIslandIdFromZW(IN.idZW);
 
                 // Ignored island short-circuit.
                 if (islandId == 0xFFFFu)

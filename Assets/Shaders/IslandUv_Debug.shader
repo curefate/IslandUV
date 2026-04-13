@@ -46,25 +46,25 @@ Shader "IslandUV/IslandUV_Debug"
             struct Attributes
             {
                 float4 positionOS : POSITION;
-                half4 color : COLOR;
-                float2 uv0 : TEXCOORD0;
-                float2 uv1 : TEXCOORD1;
-                float2 uv2 : TEXCOORD2;
-                float2 uv3 : TEXCOORD3;
-                float2 uv4 : TEXCOORD4;
-                float2 uv5 : TEXCOORD5;
-                float2 uv6 : TEXCOORD6;
-                float2 uv7 : TEXCOORD7;
+                float4 uv0 : TEXCOORD0;
+                float4 uv1 : TEXCOORD1;
+                float4 uv2 : TEXCOORD2;
+                float4 uv3 : TEXCOORD3;
+                float4 uv4 : TEXCOORD4;
+                float4 uv5 : TEXCOORD5;
+                float4 uv6 : TEXCOORD6;
+                float4 uv7 : TEXCOORD7;
             };
 
             struct Varyings
             {
                 float4 positionHCS : SV_POSITION;
-                half4 color : COLOR;
                 float2 uv : TEXCOORD0;
+                float2 idZW : TEXCOORD1;
             };
 
-            float2 PickUv(Attributes IN)
+
+            float4 PickUv4(Attributes IN)
             {
                 // Branching is fine for debug.
                 if (_UvChannel < 0.5) return IN.uv0;
@@ -92,21 +92,21 @@ Shader "IslandUV/IslandUV_Debug"
                 return c.z * lerp(K.xxx, saturate(p - K.xxx), c.y);
             }
 
-            uint DecodeIslandIdFromColor(half4 c)
+            uint DecodeIslandIdFromZW(float2 zw)
             {
-                // CPU packs: id = r + g*256, with r/g as bytes.
-                // In shader, COLOR is typically normalized 0..1.
-                uint r = (uint)round(saturate(c.r) * 255.0);
-                uint g = (uint)round(saturate(c.g) * 255.0);
-                return r + (g << 8);
+                // CPU packs: z = lowByte/255, w = highByte/255.
+                uint lo = (uint)round(saturate(zw.x) * 255.0);
+                uint hi = (uint)round(saturate(zw.y) * 255.0);
+                return lo + (hi << 8);
             }
 
             Varyings vert(Attributes IN)
             {
                 Varyings OUT;
                 OUT.positionHCS = TransformObjectToHClip(IN.positionOS.xyz);
-                OUT.uv = PickUv(IN);
-                OUT.color = IN.color;
+                float4 uv4 = PickUv4(IN);
+                OUT.uv = uv4.xy;
+                OUT.idZW = uv4.zw;
                 return OUT;
             }
 
@@ -114,7 +114,7 @@ Shader "IslandUV/IslandUV_Debug"
             {
                 float2 uv = IN.uv;
 
-                uint islandId = DecodeIslandIdFromColor(IN.color);
+                uint islandId = DecodeIslandIdFromZW(IN.idZW);
 
                 if (_HighlightIgnored > 0.5 && islandId == 0xFFFF)
                 {

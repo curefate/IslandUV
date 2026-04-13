@@ -1,9 +1,10 @@
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
-/// SceneView tool that picks an islandId by clicking a MeshCollider and reading the vertex color (R/G) of the hit triangle.
+/// SceneView tool that picks an islandId by clicking a MeshCollider and reading the islandId encoded in UV.zw.
 /// </summary>
 public sealed class IslandUvIslandIdPickerTool
 {
@@ -29,6 +30,8 @@ public sealed class IslandUvIslandIdPickerTool
         SceneView.duringSceneGui -= DuringSceneGui;
     }
 
+    private readonly List<Vector4> _uv4 = new List<Vector4>(1024);
+
     private void DuringSceneGui(SceneView sceneView)
     {
         if (!Enabled) return;
@@ -48,7 +51,7 @@ public sealed class IslandUvIslandIdPickerTool
         var mc = hit.collider as MeshCollider;
         if (mc == null || mc.sharedMesh == null) return;
 
-        if (!TryReadIslandIdFromMeshHit(mc.sharedMesh, hit.triangleIndex, out ushort islandId))
+    if (!TryReadIslandIdFromMeshHit(mc.sharedMesh, hit.triangleIndex, out ushort islandId))
             return;
 
         _onPicked?.Invoke(go, islandId);
@@ -58,14 +61,19 @@ public sealed class IslandUvIslandIdPickerTool
         if (e.control) e.Use();
     }
 
-    private static bool TryReadIslandIdFromMeshHit(Mesh mesh, int triangleIndex, out ushort islandId)
+    private bool TryReadIslandIdFromMeshHit(Mesh mesh, int triangleIndex, out ushort islandId)
     {
         islandId = 0;
         if (mesh == null) return false;
         if (triangleIndex < 0) return false;
 
-        var colors = mesh.colors32;
-        if (colors == null || colors.Length != mesh.vertexCount) return false;
+        if (!TryGetImporterUvChannel(mesh, out int uvChannel))
+            return false;
+
+        _uv4.Clear();
+        mesh.GetUVs(uvChannel, _uv4);
+        if (_uv4 == null || _uv4.Count != mesh.vertexCount)
+            return false;
 
         var tris = mesh.triangles;
         int triStart = triangleIndex * 3;
@@ -75,11 +83,41 @@ public sealed class IslandUvIslandIdPickerTool
         int i1 = tris[triStart + 1];
         int i2 = tris[triStart + 2];
 
-        ushort id0 = (ushort)(colors[i0].r | (colors[i0].g << 8));
-        ushort id1 = (ushort)(colors[i1].r | (colors[i1].g << 8));
-        ushort id2 = (ushort)(colors[i2].r | (colors[i2].g << 8));
+    ushort id0 = DecodeIdFromZW(_uv4[i0].z, _uv4[i0].w);
+    ushort id1 = DecodeIdFromZW(_uv4[i1].z, _uv4[i1].w);
+    ushort id2 = DecodeIdFromZW(_uv4[i2].z, _uv4[i2].w);
 
         islandId = Majority(id0, id1, id2);
+        return true;
+    }
+
+    private static ushort DecodeIdFromZW(float z, float w)
+    {
+        // Encoded as: z=lo/255, w=hi/255.
+        int lo = Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(z) * 255f), 0, 255);
+        int hi = Mathf.Clamp(Mathf.RoundToInt(Mathf.Clamp01(w) * 255f), 0, 255);
+        return (ushort)(lo | (hi << 8));
+    }
+
+    private static bool TryGetImporterUvChannel(Mesh mesh, out int uvChannel)
+    {
+        uvChannel = 2;
+        if (mesh == null) return false;
+
+        // Try to resolve the mesh asset path -> importer -> IslandUV settings.
+        string path = AssetDatabase.GetAssetPath(mesh);
+        if (string.IsNullOrEmpty(path))
+            return false;
+
+        var importer = AssetImporter.GetAtPath(path);
+        if (importer == null)
+            return false;
+
+        IslandUvImporterSettings.TryGetSettings(importer, out var settings, out _);
+        if (settings == null)
+            return false;
+
+        uvChannel = Mathf.Clamp(settings.targetUvChannel, 0, 7);
         return true;
     }
 

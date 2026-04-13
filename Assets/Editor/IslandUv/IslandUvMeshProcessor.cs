@@ -70,8 +70,7 @@ public static class IslandUvMeshProcessor
         bool hasNormals,
         List<Vector3> newVertices,
         List<Vector3> newNormals,
-    List<Vector2> newTextUV,
-    List<Color32> newColors,
+    List<Vector4> newTextUV,
     Dictionary<(int v, int i), int> vertexMap,
     IslandUvSettings.Settings settings)
     {
@@ -88,14 +87,6 @@ public static class IslandUvMeshProcessor
         if (hasNormals)
             newNormals.Add(srcNormals[originalV]);
 
-        // 16-bit islandId packing into Color32 (little endian): id = r + g*256
-        // For ignored islands, we use a fixed sentinel value 0xFFFF (65535), which is the unsigned equivalent of -1.
-        // Note: if islandCount can exceed 65535 in the future, upgrade packing (e.g. RGB 24-bit).
-        ushort id16 = ignoredIsland ? (ushort)0xFFFF : (ushort)Mathf.Clamp(islandId, 0, 65534);
-        byte r = (byte)(id16 & 0xFF);
-        byte g = (byte)((id16 >> 8) & 0xFF);
-        newColors.Add(new Color32(r, g, 0, 255));
-
         // Project to island plane (T/B)
         Vector3 p = vPos - islandBasis.origin;
         Vector2 uv = new Vector2(Vector3.Dot(p, islandBasis.T), Vector3.Dot(p, islandBasis.B));
@@ -109,7 +100,14 @@ public static class IslandUvMeshProcessor
         // Ignored islands: write fixed UV (0,0)
         if (ignoredIsland) uv = Vector2.zero;
 
-        newTextUV.Add(uv);
+    // IslandId is encoded into the SAME UV channel as islandUV, in the zw components as two bytes (0..1).
+    // 16-bit little endian: id = lo + hi*256.
+    // For ignored islands, we use sentinel 0xFFFF.
+    ushort id16 = ignoredIsland ? (ushort)0xFFFF : (ushort)Mathf.Clamp(islandId, 0, 65534);
+    float lo = (id16 & 0xFF) / 255.0f;
+    float hi = ((id16 >> 8) & 0xFF) / 255.0f;
+
+    newTextUV.Add(new Vector4(uv.x, uv.y, lo, hi));
 
         return newIndex;
     }
@@ -406,8 +404,7 @@ public static class IslandUvMeshProcessor
         // 6) Calculate final UVs
         var newVertices = new List<Vector3>(vertices.Length);
         var newNormals = new List<Vector3>(vertices.Length);
-        var newTextUV = new List<Vector2>(vertices.Length);
-        var newColors = new List<Color32>(vertices.Length);
+    var newTextUV = new List<Vector4>(vertices.Length);
 
         // srcNormals / hasNormals are computed earlier (used both for clustering normals and for output normal copying).
 
@@ -428,9 +425,9 @@ public static class IslandUvMeshProcessor
 
             bool isIgnored = ignoredIsland[iid];
 
-            int o0 = GetOrCreateVertex(i0, iid, basis, isIgnored, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
-            int o1 = GetOrCreateVertex(i1, iid, basis, isIgnored, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
-            int o2 = GetOrCreateVertex(i2, iid, basis, isIgnored, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, newColors, vertexMap, s);
+            int o0 = GetOrCreateVertex(i0, iid, basis, isIgnored, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o1 = GetOrCreateVertex(i1, iid, basis, isIgnored, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
+            int o2 = GetOrCreateVertex(i2, iid, basis, isIgnored, vertices, srcNormals, hasNormals, newVertices, newNormals, newTextUV, vertexMap, s);
 
             newTrianglesBySubMesh[tris[i].subMesh].Add(o0);
             newTrianglesBySubMesh[tris[i].subMesh].Add(o1);
@@ -447,8 +444,6 @@ public static class IslandUvMeshProcessor
         mesh.SetVertices(newVertices);
         if (hasNormals) mesh.SetNormals(newNormals);
         else mesh.RecalculateNormals();
-
-        mesh.SetColors(newColors);
 
         mesh.subMeshCount = subMeshCount;
         for (int sm = 0; sm < subMeshCount; sm++)
