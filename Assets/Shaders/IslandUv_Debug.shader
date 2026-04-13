@@ -1,4 +1,4 @@
-Shader "IslandUV/Debug/IslandIdGradient"
+Shader "IslandUV/IslandUV_Debug"
 {
     Properties
     {

@@ -101,7 +101,7 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _GradAxis: 1
+    - _GradAxis: 2
     - _HighlightIgnored: 1
     - _Metallic: 0
     - _OcclusionStrength: 1
