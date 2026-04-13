@@ -100,14 +100,14 @@ public static class IslandUvMeshProcessor
         // Ignored islands: write fixed UV (0,0)
         if (ignoredIsland) uv = Vector2.zero;
 
-    // IslandId is encoded into the SAME UV channel as islandUV, in the zw components as two bytes (0..1).
-    // 16-bit little endian: id = lo + hi*256.
-    // For ignored islands, we use sentinel 0xFFFF.
-    ushort id16 = ignoredIsland ? (ushort)0xFFFF : (ushort)Mathf.Clamp(islandId, 0, 65534);
-    float lo = (id16 & 0xFF) / 255.0f;
-    float hi = ((id16 >> 8) & 0xFF) / 255.0f;
+        // IslandId is encoded into the SAME UV channel as islandUV, in the zw components as two bytes (0..1).
+        // 16-bit little endian: id = lo + hi*256.
+        // For ignored islands, we use sentinel 0xFFFF.
+        ushort id16 = ignoredIsland ? (ushort)0xFFFF : (ushort)Mathf.Clamp(islandId, 0, 65534);
+        float lo = (id16 & 0xFF) / 255.0f;
+        float hi = ((id16 >> 8) & 0xFF) / 255.0f;
 
-    newTextUV.Add(new Vector4(uv.x, uv.y, lo, hi));
+        newTextUV.Add(new Vector4(uv.x, uv.y, lo, hi));
 
         return newIndex;
     }
@@ -138,7 +138,7 @@ public static class IslandUvMeshProcessor
         Vector3[] srcNormals = mesh.normals;
         bool hasNormals = srcNormals != null && srcNormals.Length == vertices.Length;
 
-    bool useVertexNormals = (s.normalSource == IslandUvSettings.NormalSource.Vertex);
+        bool useVertexNormals = (s.normalSource == IslandUvSettings.NormalSource.Vertex);
         if (useVertexNormals && !hasNormals)
         {
             Debug.LogWarning($"Mesh '{mesh.name}' has no valid vertex normals. Falling back to face normals for IslandUV clustering.");
@@ -261,7 +261,7 @@ public static class IslandUvMeshProcessor
         int islandCount = 0;
         var queue = new Queue<int>();
 
-    bool useIslandRef = (s.propagation == IslandUvSettings.Propagation.Island);
+        bool useIslandRef = (s.propagation == IslandUvSettings.Propagation.Island);
         var islandRefNormal = new List<Vector3>(128);
         var islandRefCount = new List<int>(128);
 
@@ -309,6 +309,18 @@ public static class IslandUvMeshProcessor
                     }
                 }
             }
+        }
+
+        // islandId is stored as 16-bit, with 0xFFFF reserved for ignored islands.
+        // So valid island ids are 0..65534, i.e. at most 65535 islands.
+        // If we exceed this, we skip processing to avoid producing invalid/ambiguous ids.
+        const int MaxIslands = 0xFFFF; // 65535 valid ids (0..65534). 0xFFFF is reserved.
+        if (islandCount > MaxIslands)
+        {
+            Debug.LogWarning(
+                $"[IslandUV] Mesh '{mesh.name}' produced {islandCount} islands, which exceeds the 16-bit islandId limit ({MaxIslands}). " +
+                "Skipping IslandUV processing for this mesh. Consider increasing Threshold (deg) or enabling 'Allow Across SubMeshes' to reduce island count.");
+            return;
         }
 
         // 5) Calculate island basis
@@ -404,7 +416,7 @@ public static class IslandUvMeshProcessor
         // 6) Calculate final UVs
         var newVertices = new List<Vector3>(vertices.Length);
         var newNormals = new List<Vector3>(vertices.Length);
-    var newTextUV = new List<Vector4>(vertices.Length);
+        var newTextUV = new List<Vector4>(vertices.Length);
 
         // srcNormals / hasNormals are computed earlier (used both for clustering normals and for output normal copying).
 
