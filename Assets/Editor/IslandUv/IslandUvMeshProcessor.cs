@@ -4,6 +4,9 @@ using System;
 using System.Collections.Generic;
 using UnityEngine.Rendering;
 
+namespace IslandUV.Editor
+{
+
 public static class IslandUvMeshProcessor
 {
     private const ushort IgnoredIslandId = 0xFFFF;
@@ -535,4 +538,5 @@ public static class IslandUvMeshProcessor
     }
 }
 
+}
 #endif

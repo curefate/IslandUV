@@ -3,6 +3,9 @@ using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
 
+namespace IslandUV.Editor
+{
+
 /// <summary>
 /// SceneView tool that picks an islandId by clicking a MeshCollider and reading the islandId encoded in UV.zw.
 /// </summary>
@@ -127,5 +130,7 @@ public sealed class IslandUvIslandIdPickerTool
         if (b == c) return b;
         return a;
     }
+}
+
 }
 #endif

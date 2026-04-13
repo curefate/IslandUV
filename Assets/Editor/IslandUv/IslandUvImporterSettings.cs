@@ -4,6 +4,9 @@ using UnityEngine;
 using Unity.Plastic.Newtonsoft.Json;
 using Unity.Plastic.Newtonsoft.Json.Linq;
 
+namespace IslandUV.Editor
+{
+
 /// <summary>
 /// Shared IslandUV settings used by importer.userData, postprocessor, and mesh processor.
 /// Editor-only by design (lives under Assets/Editor).
@@ -178,4 +181,6 @@ public static class IslandUvImporterSettings
             return false;
         }
     }
+}
+
 }

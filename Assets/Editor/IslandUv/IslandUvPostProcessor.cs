@@ -2,6 +2,9 @@
 using UnityEditor;
 using UnityEngine;
 
+namespace IslandUV.Editor
+{
+
 public class IslandUvPostProcessor : AssetPostprocessor
 {
     void OnPreprocessModel()
@@ -29,5 +32,7 @@ public class IslandUvPostProcessor : AssetPostprocessor
             }
         }
     }
+}
+
 }
 #endif

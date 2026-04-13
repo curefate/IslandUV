@@ -3,6 +3,9 @@ using UnityEditor;
 using UnityEngine;
 using Unity.Plastic.Newtonsoft.Json;
 
+namespace IslandUV.Editor
+{
+
 public class IslandUvImporterSettingsWindow : EditorWindow
 {
     private Object _selected;
@@ -270,5 +273,7 @@ public class IslandUvImporterSettingsWindow : EditorWindow
         string hex = $"0x{islandId:X4}";
         Debug.Log($"[IslandUV] {go.name}: islandId = {islandId} ({hex})", go);
     }
+}
+
 }
 #endif

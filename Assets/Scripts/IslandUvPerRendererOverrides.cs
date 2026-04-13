@@ -1,6 +1,9 @@
 using System;
 using UnityEngine;
 
+namespace IslandUV.Runtime
+{
+
 /// <summary>
 /// Per-renderer overrides for IslandUV final shader.
 /// This component stores override data (serialized) and applies it to the attached Renderer via MaterialPropertyBlock.
@@ -170,4 +173,6 @@ public class IslandUvPerRendererOverrides : MonoBehaviour
                 overrides[i].ids = new ushort[IdsPerSlot] { MaxId, MaxId, MaxId, MaxId };
         }
     }
+}
+
 }
