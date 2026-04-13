@@ -1,5 +1,13 @@
 {
   "dependencies": {
+    "com.majulizi.islanduv": {
+      "version": "file:com.majulizi.islanduv",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.2"
+      }
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.11",
       "depth": 0,

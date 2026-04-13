@@ -1,0 +1,33 @@
+{
+	"name": "com.majulizi.islanduv",
+	"displayName": "IslandUV",
+	"version": "0.1.0",
+	"unity": "6000.4",
+	"unityRelease": "0f1",
+	"description": "A Unity Editor extension that generates UV2 coordinates for lightmapping based on UV islands. It encodes the islandId in UV2.zw, which can be used for various purposes such as custom lightmapping or shader effects.",
+	"license": "MIT",
+	"keywords": [
+		"unity",
+		"upm",
+		"uv",
+		"mesh",
+		"importer",
+		"editor",
+		"urp",
+		"shader"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/curefate/IslandUV.git"
+	},
+	"dependencies": {
+		"com.unity.nuget.newtonsoft-json": "3.2.2"
+	},
+	"author": {
+		"name": "Zijie Li",
+		"url": "https://zijie-portfolio.vercel.app/"
+	},
+	"documentationUrl": "https://github.com/curefate/IslandUV/tree/main/Packages/com.majulizi.islanduv",
+	"changelogUrl": "https://github.com/curefate/IslandUV/blob/main/Packages/com.majulizi.islanduv/CHANGELOG.md",
+	"licensesUrl": "https://github.com/curefate/IslandUV/blob/main/Packages/com.majulizi.islanduv/LICENSE"
+}

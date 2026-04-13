@@ -1,8 +1,8 @@
 using System;
 using UnityEditor;
 using UnityEngine;
-using Unity.Plastic.Newtonsoft.Json;
-using Unity.Plastic.Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace IslandUV.Editor
 {
