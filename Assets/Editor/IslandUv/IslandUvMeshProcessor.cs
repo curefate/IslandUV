@@ -384,10 +384,33 @@ public static class IslandUvMeshProcessor
             var normal = islandNormSum[i].sqrMagnitude < 1e-12f ? Vector3.up : islandNormSum[i].normalized;
             var origin = islandVerCount[i] > 0 ? islandVerSum[i] / islandVerCount[i] : Vector3.zero;
 
-            Vector3 refAxis = (Mathf.Abs(Vector3.Dot(normal, Vector3.up)) < 0.999f) ? Vector3.up : Vector3.right;
-            var tangent = Vector3.Cross(refAxis, normal).normalized;
-            if (tangent.sqrMagnitude < 1e-12f) tangent = Vector3.right;
-            var bitangent = Vector3.Cross(normal, tangent).normalized;
+            // UV orientation (default behavior): align U direction to model-local +Z as much as possible,
+            // then fix the sign so different islands don't randomly flip (helps keep text readable).
+            // T = projected forward axis on island plane; B = cross(normal, T) (right-handed).
+            Vector3 forward = Vector3.forward;
+
+            Vector3 ProjectOnPlane(Vector3 v, Vector3 n) => v - n * Vector3.Dot(v, n);
+
+            Vector3 tangent = ProjectOnPlane(forward, normal);
+            if (tangent.sqrMagnitude <= 1e-12f)
+            {
+                // forward is parallel to normal: try an alternate axis.
+                tangent = ProjectOnPlane(Vector3.right, normal);
+                if (tangent.sqrMagnitude <= 1e-12f)
+                    tangent = ProjectOnPlane(Vector3.up, normal);
+            }
+            tangent = tangent.sqrMagnitude <= 1e-12f ? Vector3.right : tangent.normalized;
+
+            // Sign fix: keep tangent pointing roughly towards +Z.
+            if (Vector3.Dot(tangent, forward) < 0f)
+                tangent = -tangent;
+
+            var bitangent = Vector3.Cross(normal, tangent);
+            bitangent = bitangent.sqrMagnitude <= 1e-12f ? Vector3.up : bitangent.normalized;
+
+            // Ensure a stable right-handed basis.
+            tangent = Vector3.Cross(bitangent, normal);
+            tangent = tangent.sqrMagnitude <= 1e-12f ? Vector3.right : tangent.normalized;
 
             islandBasis[i] = new IslandBasis
             {
