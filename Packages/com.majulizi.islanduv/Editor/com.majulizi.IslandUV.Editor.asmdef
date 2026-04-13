@@ -1,5 +1,5 @@
 {
-    "name": "com.majulizi.IslandUV.Editor",
+    "name": "com.majulizi.islanduv.editor",
     "rootNamespace": "",
     "references": [
         "Unity.Newtonsoft.Json"

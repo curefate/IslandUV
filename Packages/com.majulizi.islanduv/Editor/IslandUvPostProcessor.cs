@@ -10,10 +10,13 @@ public class IslandUvPostProcessor : AssetPostprocessor
     void OnPreprocessModel()
     {
         var importer = assetImporter as ModelImporter;
-        if (importer != null)
-        {
-            importer.isReadable = true;  // 确保模型可读
-        }
+    if (importer == null) return;
+
+    // Only require readable meshes when IslandUV is enabled.
+    // This avoids forcing Read/Write on unrelated models.
+    IslandUvImporterSettings.TryGetSettings(importer, out var settings, out _);
+    if (settings != null && settings.enabled)
+        importer.isReadable = true;
     }
 
     void OnPostprocessModel(GameObject model)

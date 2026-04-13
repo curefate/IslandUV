@@ -1,4 +1,4 @@
 ﻿<Solution>
-  <Project Path="com.majulizi.IslandUV.Runtime.csproj" />
-  <Project Path="com.majulizi.IslandUV.Editor.csproj" />
+  <Project Path="com.majulizi.islanduv.runtime.csproj" />
+  <Project Path="com.majulizi.islanduv.editor.csproj" />
 </Solution>
