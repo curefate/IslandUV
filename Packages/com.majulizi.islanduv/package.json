@@ -2,7 +2,7 @@
 	"name": "com.majulizi.islanduv",
 	"displayName": "IslandUV",
 	"version": "0.1.0",
-	"unity": "6000.4",
+	"unity": "6000.0",
 	"unityRelease": "0f1",
 	"description": "A Unity Editor extension that generates UV2 coordinates for lightmapping based on UV islands. It encodes the islandId in UV2.zw, which can be used for various purposes such as custom lightmapping or shader effects.",
 	"license": "MIT",
