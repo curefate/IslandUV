@@ -16,6 +16,13 @@ public class IslandUvImporterSettingsWindow : EditorWindow
     private bool _usedDefault;
 
     private string _status;
+    private MessageType _statusType = MessageType.Info;
+
+    // The resolved asset path we are operating on. For scene selections, this is derived from MeshFilter.sharedMesh.
+    private string _assetPath;
+
+    // Only allow editing for model file extensions.
+    private bool _canEdit;
 
     // --- IslandId Picker (SceneView) ---
     private IslandUvIslandIdPickerTool _picker;
@@ -54,40 +61,99 @@ public class IslandUvImporterSettingsWindow : EditorWindow
 
     private void RefreshFromSelection()
     {
+        ResetState();
         _selected = Selection.activeObject;
-        _importer = null;
-        _status = null;
 
         if (_selected == null)
-        {
-            _applied = null;
-            _editing = null;
             return;
-        }
 
-        string path = AssetDatabase.GetAssetPath(_selected);
-        if (string.IsNullOrEmpty(path))
-        {
-            _applied = null;
-            _editing = null;
+        if (!TryResolveAssetPath(_selected, out _assetPath, out _status, out _statusType))
             return;
-        }
 
-        _importer = AssetImporter.GetAtPath(path);
+        _importer = AssetImporter.GetAtPath(_assetPath);
         if (_importer == null)
         {
-            _applied = null;
-            _editing = null;
+            SetStatus("No AssetImporter found for the selected asset.", MessageType.Warning);
             return;
         }
 
-        // Only show for model assets (simple extension check keeps it lightweight).
-        string ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
-        if (ext != ".fbx" && ext != ".obj" && ext != ".dae" && ext != ".blend")
+        _canEdit = IsSupportedModelPath(_assetPath);
+        if (!_canEdit)
         {
-            _status = "Selected asset doesn't look like a model file.";
+            SetStatus("Selected asset doesn't look like a model file.", MessageType.Warning);
+            // Still read settings for diagnostics, but we'll hide the panel and block Apply/Clear.
+            ReloadSettingsFromImporter();
+            return;
         }
 
+        ReloadSettingsFromImporter();
+    }
+
+    private void ResetState()
+    {
+        _importer = null;
+        _assetPath = null;
+        _status = null;
+        _statusType = MessageType.Info;
+        _canEdit = false;
+        _usedDefault = false;
+        _applied = null;
+        _editing = null;
+    }
+
+    private static bool IsSupportedModelPath(string assetPath)
+    {
+        string ext = System.IO.Path.GetExtension(assetPath).ToLowerInvariant();
+        return ext == ".fbx" || ext == ".obj" || ext == ".dae" || ext == ".blend";
+    }
+
+    private static bool TryResolveAssetPath(Object selected, out string assetPath, out string status, out MessageType statusType)
+    {
+        status = null;
+        statusType = MessageType.Info;
+
+        // Project selection.
+        assetPath = AssetDatabase.GetAssetPath(selected);
+        if (!string.IsNullOrEmpty(assetPath))
+            return true;
+
+        // Scene selection: try MeshFilter.sharedMesh.
+        // NOTE: We intentionally do NOT search children. We only use the selected object's own components.
+        // NOTE: We intentionally do NOT support SkinnedMeshRenderer here; add it if you need character meshes.
+        GameObject go = selected as GameObject;
+        if (go == null && selected is Component c) go = c.gameObject;
+
+        if (go == null)
+            return false;
+
+        var mf = go.GetComponent<MeshFilter>();
+        var mesh = mf != null ? mf.sharedMesh : null;
+        if (mesh == null)
+        {
+            status = "Selected scene object has no MeshFilter/sharedMesh. Select a model asset (.fbx/.obj/.dae/.blend) or a GameObject with MeshFilter.";
+            statusType = MessageType.Warning;
+            return false;
+        }
+
+        assetPath = AssetDatabase.GetAssetPath(mesh);
+        if (string.IsNullOrEmpty(assetPath))
+        {
+            status = "MeshFilter.sharedMesh is not an asset (no asset path). Select a model asset (.fbx/.obj/.dae/.blend).";
+            statusType = MessageType.Warning;
+            return false;
+        }
+
+        return true;
+    }
+
+    private void SetStatus(string status, MessageType type)
+    {
+        _status = status;
+        _statusType = type;
+    }
+
+    private void ReloadSettingsFromImporter()
+    {
         IslandUvImporterSettings.TryGetSettings(_importer, out _applied, out _usedDefault);
         _editing = DeepCopy(_applied);
     }
@@ -110,8 +176,7 @@ public class IslandUvImporterSettingsWindow : EditorWindow
             return;
         }
 
-        string path = AssetDatabase.GetAssetPath(_selected);
-        EditorGUILayout.LabelField("Asset", path);
+        EditorGUILayout.LabelField("Asset", _assetPath);
 
         if (_importer == null)
         {
@@ -120,7 +185,11 @@ public class IslandUvImporterSettingsWindow : EditorWindow
         }
 
         if (!string.IsNullOrEmpty(_status))
-            EditorGUILayout.HelpBox(_status, MessageType.Info);
+            EditorGUILayout.HelpBox(_status, _statusType);
+
+        // If not a supported model asset, we don't show the settings panel.
+        if (!_canEdit)
+            return;
 
         if (_usedDefault)
             EditorGUILayout.HelpBox("No IslandUV data found (or parse failed). Using defaults.", MessageType.Info);
@@ -150,6 +219,7 @@ public class IslandUvImporterSettingsWindow : EditorWindow
             {
                 _editing = DeepCopy(_applied);
                 _status = "Reverted.";
+                _statusType = MessageType.Info;
             }
             if (GUILayout.Button("Apply", GUILayout.Width(100)))
             {
@@ -241,8 +311,7 @@ public class IslandUvImporterSettingsWindow : EditorWindow
             // Reimport only on Apply/Clear.
             _importer.SaveAndReimport();
 
-            IslandUvImporterSettings.TryGetSettings(_importer, out _applied, out _usedDefault);
-            _editing = DeepCopy(_applied);
+            ReloadSettingsFromImporter();
             _status = successStatus;
         }
         catch (System.Exception ex)
