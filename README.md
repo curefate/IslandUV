@@ -19,7 +19,7 @@ It also encodes a 16-bit `islandId` into the **same UV channel** (`uv.zw`), so s
 Install it via **Package Manager → Add package from git URL** from:
 
 ```text
-https://github.com/curefate/IslandUV.git?path=Packages/com.majulizi.islanduv
+https://github.com/curefate/IslandUV.git
 ```
 
 Install Newtonsoft.Json from:
@@ -69,4 +69,4 @@ Both shaders can decode `islandId` from `uv.zw` and allow selecting which UV cha
 
 ## License
 
-[MIT](https://github.com/curefate/IslandUV/blob/main/Packages/com.majulizi.islanduv/LICENSE)
+[MIT](https://github.com/curefate/IslandUV/blob/main/LICENSE)
