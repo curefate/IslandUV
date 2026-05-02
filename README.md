@@ -4,9 +4,9 @@ IslandUV is a Unity **Editor** tool that generates per-island UVs at import time
 
 It also encodes a 16-bit `islandId` into the **same UV channel** (`uv.zw`), so shaders and tools can identify which island a fragment belongs to.
 
-![IslandUV screenshot](Docs/images/screenshot.png)
-![IslandUV screenshot2](Docs/images/screenshot2.png)
-![IslandUV screenshot3](Docs/images/screenshot3.png)
+![IslandUV screenshot](Documentation~/images/screenshot.png)
+![IslandUV screenshot2](Documentation~/images/screenshot2.png)
+![IslandUV screenshot3](Documentation~/images/screenshot3.png)
 
 ## Requirements
 
